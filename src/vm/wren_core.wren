@@ -2,7 +2,41 @@ class Bool {}
 class Fiber {}
 class Fn {}
 class Null {}
-class Num {}
+class Num {
+  trait(Key) {
+    if (Key is Class) {
+      var Klass = Num.traits[Key.name]
+      return Klass.new(this)
+    }
+    return Num.traits[Key].call(this)
+  }
+
+  static trait(Key) {
+    if (Key is Class) {
+      var Klass = Num.traits[Key.name]
+      return Klass
+    }
+    return Num.traits[Key]
+  }
+
+  static trait(Key, Value) {
+    if (Key is Class) {
+      return Num.traits[Key.name] = Value
+    }
+    return Num.traits[Key] = Value
+  }
+
+  static use(Key) {
+    return Num.trait(Key, Key)
+  }
+  
+  static traits {
+    if (!__traits) {
+      __traits = Map.new()
+    }
+    return __traits
+  }
+}
 
 class Sequence {
   all(f) {
@@ -182,6 +216,20 @@ class WhereSequence is Sequence {
 }
 
 class String is Sequence {
+  trait(key) {String.traits[key].call(this)}
+  trait(key, value) {String.trait(key, value)}
+  traits {String.traits}
+  
+  static trait(key) {String.traits[key]}
+  static trait(key, value) {String.traits[key] = value}
+  
+  static traits {
+    if (!__traits) {
+      __traits = Map.new()
+    }
+    return __traits
+  }
+
   bytes { StringByteSequence.new(this) }
   codePoints { StringCodePointSequence.new(this) }
 
