@@ -212,13 +212,6 @@ void wrenCollectGarbage(WrenVM* vm)
 
 void* wrenReallocate(WrenVM* vm, void* memory, size_t oldSize, size_t newSize)
 {
-#if WREN_DEBUG_TRACE_MEMORY
-  // Explicit cast because size_t has different sizes on 32-bit and 64-bit and
-  // we need a consistent type for the format string.
-  printf("reallocate %p %lu -> %lu\n",
-         memory, (unsigned long)oldSize, (unsigned long)newSize);
-#endif
-
   // If new bytes are being allocated, add them to the total count. If objects
   // are being completely deallocated, we don't track that (since we don't
   // track the original size). Instead, that will be handled while marking
@@ -233,7 +226,20 @@ void* wrenReallocate(WrenVM* vm, void* memory, size_t oldSize, size_t newSize)
   if (newSize > 0 && vm->bytesAllocated > vm->nextGC) wrenCollectGarbage(vm);
 #endif
 
-  return vm->config.reallocateFn(memory, newSize, vm->config.userData);
+  void* result = vm->config.reallocateFn(memory, newSize, vm->config.userData);
+  
+#if WREN_DEBUG_TRACE_MEMORY
+  // Explicit cast because size_t has different sizes on 32-bit and 64-bit and
+  // we need a consistent type for the format string.
+  printf(
+    "reallocate %p %lu ->  %p %lu\n",
+    memory,
+    (unsigned long)oldSize,
+    result,
+    (unsigned long)newSize);
+#endif
+
+  return result;
 }
 
 // Captures the local variable [local] into an [Upvalue]. If that local is
@@ -823,7 +829,7 @@ inline static bool checkArity(WrenVM* vm, Value value, int numArgs)
 
 // The main bytecode interpreter loop. This is where the magic happens. It is
 // also, as you can imagine, highly performance critical.
-static WrenInterpretResult runInterpreter(WrenVM* vm, register ObjFiber* fiber)
+static WrenInterpretResult runInterpreter(WrenVM* vm, ObjFiber* fiber)
 {
   // Remember the current fiber so we can find it if a GC happens.
   vm->fiber = fiber;
@@ -832,10 +838,10 @@ static WrenInterpretResult runInterpreter(WrenVM* vm, register ObjFiber* fiber)
   // Hoist these into local variables. They are accessed frequently in the loop
   // but assigned less frequently. Keeping them in locals and updating them when
   // a call frame has been pushed or popped gives a large speed boost.
-  register CallFrame* frame;
-  register Value* stackStart;
-  register uint8_t* ip;
-  register ObjFn* fn;
+  CallFrame* frame;
+  Value* stackStart;
+  uint8_t* ip;
+  ObjFn* fn;
 
   // These macros are designed to only be invoked within this function.
   #define PUSH(value)  (*fiber->stackTop++ = value)
@@ -1074,8 +1080,10 @@ static WrenInterpretResult runInterpreter(WrenVM* vm, register ObjFiber* fiber)
           break;
 
         case METHOD_FOREIGN:
+          STORE_FRAME();
           callForeign(vm, fiber, method->as.foreign, numArgs);
           if (wrenHasError(fiber)) RUNTIME_ERROR();
+          LOAD_FRAME();
           break;
 
         case METHOD_BLOCK:
@@ -1793,7 +1801,7 @@ int wrenGetListCount(WrenVM* vm, int slot)
 {
   validateApiSlot(vm, slot);
   ASSERT(IS_LIST(vm->apiStack[slot]), "Slot must hold a list.");
-  
+
   ValueBuffer elements = AS_LIST(vm->apiStack[slot])->elements;
   return elements.count;
 }
@@ -1822,7 +1830,7 @@ void wrenSetListElement(WrenVM* vm, int listSlot, int index, int elementSlot)
 
   uint32_t usedIndex = wrenValidateIndex(list->elements.count, index);
   ASSERT(usedIndex != UINT32_MAX, "Index out of bounds.");
-  
+
   list->elements.data[usedIndex] = vm->apiStack[elementSlot];
 }
 
@@ -1831,15 +1839,15 @@ void wrenInsertInList(WrenVM* vm, int listSlot, int index, int elementSlot)
   validateApiSlot(vm, listSlot);
   validateApiSlot(vm, elementSlot);
   ASSERT(IS_LIST(vm->apiStack[listSlot]), "Must insert into a list.");
-  
+
   ObjList* list = AS_LIST(vm->apiStack[listSlot]);
-  
+
   // Negative indices count from the end. 
   // We don't use wrenValidateIndex here because insert allows 1 past the end.
   if (index < 0) index = list->elements.count + 1 + index;
-  
+
   ASSERT(index <= list->elements.count, "Index out of bounds.");
-  
+
   wrenListInsert(vm, list, vm->apiStack[elementSlot], index);
 }
 
@@ -1868,6 +1876,50 @@ bool wrenGetMapContainsKey(WrenVM* vm, int mapSlot, int keySlot)
   return !IS_UNDEFINED(value);
 }
 
+void wrenGetMapKeyValueAt(WrenVM* vm, int mapSlot,int index, int keySlot, int valueSlot)
+{
+  validateApiSlot(vm, mapSlot);
+  validateApiSlot(vm, keySlot);
+  validateApiSlot(vm, valueSlot);
+  ASSERT(IS_MAP(vm->apiStack[mapSlot]), "Slot must hold a map.");
+
+  ObjMap* map = AS_MAP(vm->apiStack[mapSlot]);
+
+  uint32_t usedIndex = wrenValidateIndex(map->count, index);
+  ASSERT(usedIndex != UINT32_MAX, "Index out of bounds.");
+
+  // Iterate over the map to match the index to the correct offset
+  uint32_t mapIndex = 0;
+  uint32_t itemIndex = -1;
+  for (; mapIndex < map->capacity; mapIndex++)
+  {
+    if (!IS_UNDEFINED(map->entries[mapIndex].key))
+    {
+        itemIndex++;
+
+      // Check if we found the correct item
+      if (itemIndex == usedIndex)
+      {
+        break;
+      }
+    }
+  }
+
+  if (itemIndex != usedIndex)
+  {
+      SET_ERROR_AND_RETURN("Invalid map iterator.");
+  }
+
+  MapEntry* entry = &map->entries[mapIndex];
+  if (IS_UNDEFINED(entry->key))
+  {
+    SET_ERROR_AND_RETURN("Invalid map iterator.");
+  }
+
+  vm->apiStack[keySlot] = entry->key;
+  vm->apiStack[valueSlot] = entry->value;
+}
+
 void wrenGetMapValue(WrenVM* vm, int mapSlot, int keySlot, int valueSlot)
 {
   validateApiSlot(vm, mapSlot);
@@ -1890,7 +1942,7 @@ void wrenSetMapValue(WrenVM* vm, int mapSlot, int keySlot, int valueSlot)
   validateApiSlot(vm, keySlot);
   validateApiSlot(vm, valueSlot);
   ASSERT(IS_MAP(vm->apiStack[mapSlot]), "Must insert into a map.");
-  
+
   Value key = vm->apiStack[keySlot];
   ASSERT(wrenMapIsValidKey(key), "Key must be a value type");
 
@@ -1900,7 +1952,7 @@ void wrenSetMapValue(WrenVM* vm, int mapSlot, int keySlot, int valueSlot)
 
   Value value = vm->apiStack[valueSlot];
   ObjMap* map = AS_MAP(vm->apiStack[mapSlot]);
-  
+
   wrenMapSet(vm, map, key, value);
 }
 
@@ -1921,24 +1973,57 @@ void wrenRemoveMapValue(WrenVM* vm, int mapSlot, int keySlot,
   setSlot(vm, removedValueSlot, removed);
 }
 
+int wrenGetVariableCount(WrenVM* vm, const char* module)
+{
+  ASSERT(module != NULL, "Module cannot be NULL.");
+
+  Value moduleName = wrenStringFormat(vm, "$", module);
+  wrenPushRoot(vm, AS_OBJ(moduleName));
+
+  ObjModule* moduleObj = getModule(vm, moduleName);
+  ASSERT(moduleObj != NULL, "Could not find module.");
+
+  wrenPopRoot(vm); // moduleName.
+
+  return moduleObj->variableNames.count;
+}
+
+void wrenGetVariableAt(WrenVM* vm, const char* module, int index,
+                     int slot)
+{
+  ASSERT(module != NULL, "Module cannot be NULL.");
+
+  Value moduleName = wrenStringFormat(vm, "$", module);
+  wrenPushRoot(vm, AS_OBJ(moduleName));
+
+  ObjModule* moduleObj = getModule(vm, moduleName);
+  ASSERT(moduleObj != NULL, "Could not find module.");
+
+  wrenPopRoot(vm); // moduleName.
+
+  ASSERT(index >= 0 && index < moduleObj->variables.count, "Could not find variable.");
+
+  setSlot(vm, slot, moduleObj->variables.data[index]);
+}
+
 void wrenGetVariable(WrenVM* vm, const char* module, const char* name,
                      int slot)
 {
   ASSERT(module != NULL, "Module cannot be NULL.");
-  ASSERT(name != NULL, "Variable name cannot be NULL.");  
+  ASSERT(name != NULL, "Variable name cannot be NULL.");
 
   Value moduleName = wrenStringFormat(vm, "$", module);
   wrenPushRoot(vm, AS_OBJ(moduleName));
-  
+
   ObjModule* moduleObj = getModule(vm, moduleName);
   ASSERT(moduleObj != NULL, "Could not find module.");
-  
+
   wrenPopRoot(vm); // moduleName.
 
   int variableSlot = wrenSymbolTableFind(&moduleObj->variableNames,
                                          name, strlen(name));
   ASSERT(variableSlot != -1, "Could not find variable.");
-  
+
   setSlot(vm, slot, moduleObj->variables.data[variableSlot]);
 }
 
