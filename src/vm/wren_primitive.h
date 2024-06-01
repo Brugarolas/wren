@@ -49,6 +49,13 @@
 #define RETURN_NUM(value)   RETURN_VAL(NUM_VAL(value))
 #define RETURN_TRUE         RETURN_VAL(TRUE_VAL)
 
+#define SET_ERROR_AND_RETURN(msg)                                              \
+    do                                                                         \
+    {                                                                          \
+      vm->fiber->error = wrenNewStringLength(vm, msg, sizeof(msg) - 1);        \
+      return;                                                                  \
+    } while (false)
+
 #define RETURN_ERROR(msg)                                                      \
     do                                                                         \
     {                                                                          \
