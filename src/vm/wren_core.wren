@@ -1,7 +1,44 @@
 class Bool {}
 class Fiber {}
+class Fn {
+  !~(arg) { !(arg ~~ this) }
+}
 class Null {}
-class Num {}
+class Num {
+  trait(Key) {
+    if (Key is Class) {
+      var Klass = Num.traits[Key.name]
+      return Klass.new(this)
+    }
+    return Num.traits[Key].call(this)
+  }
+
+  static trait(Key) {
+    if (Key is Class) {
+      var Klass = Num.traits[Key.name]
+      return Klass
+    }
+    return Num.traits[Key]
+  }
+
+  static trait(Key, Value) {
+    if (Key is Class) {
+      return Num.traits[Key.name] = Value
+    }
+    return Num.traits[Key] = Value
+  }
+
+  static use(Key) {
+    return Num.trait(Key, Key)
+  }
+  
+  static traits {
+    if (!__traits) {
+      __traits = Map.new()
+    }
+    return __traits
+  }
+}
 
 class Fn {
   callAll(args) {
@@ -51,6 +88,12 @@ class Sequence {
       if (element == item) return true
     }
     return false
+  }
+
+  ~~(element) { contains(element) }
+
+  !~(element) {
+    return !contains(element)
   }
 
   count {
@@ -204,9 +247,34 @@ class WhereSequence is Sequence {
   iteratorValue(iterator) { _sequence.iteratorValue(iterator) }
 }
 
+class SeqMatchIfContains {
+  construct new(seq) {
+    _seq = seq
+  }
+
+  ~~(needle) { _seq.contains(needle) }
+  !~(needle) { !_seq.contains(needle) }
+}
+
 class String is Sequence {
+  trait(key) {String.traits[key].call(this)}
+  trait(key, value) {String.trait(key, value)}
+  traits {String.traits}
+  
+  static trait(key) {String.traits[key]}
+  static trait(key, value) {String.traits[key] = value}
+  
+  static traits {
+    if (!__traits) {
+      __traits = Map.new()
+    }
+    return __traits
+  }
+
   bytes { StringByteSequence.new(this) }
   codePoints { StringCodePointSequence.new(this) }
+
+  part { SeqMatchIfContains.new(this) }
 
   split(delimiter) {
     if (!(delimiter is String) || delimiter.isEmpty) {
@@ -257,6 +325,17 @@ class String is Sequence {
     if (last < size) result = result + this[last..-1]
 
     return result
+  }
+
+  lower {
+    var output = ""
+    for (c in codePoints) {
+      if ((c >= 65 && c <= 90) || (c >= 192 && c <= 214) || (c >= 216 && c <= 222)) {
+        c = c + 32
+      }
+      output = output + String.fromCodePoint(c)
+    }
+    return output
   }
 
   trim() { trim_("\t\r\n ", true, true) }

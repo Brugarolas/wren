@@ -50,6 +50,7 @@
 // available in standard C++98.
 #define ERROR_MESSAGE_SIZE (80 + MAX_VARIABLE_NAME + 15)
 
+// CAUTION: if you change this, also update the rules[] below.
 typedef enum
 {
   TOKEN_LEFT_PAREN,
@@ -73,11 +74,13 @@ typedef enum
   TOKEN_GTGT,
   TOKEN_PIPE,
   TOKEN_PIPEPIPE,
+  TOKEN_PIPEOPERATOR,
   TOKEN_CARET,
   TOKEN_AMP,
   TOKEN_AMPAMP,
   TOKEN_BANG,
   TOKEN_TILDE,
+  TOKEN_TILDETILDE,
   TOKEN_QUESTION,
   TOKEN_EQ,
   TOKEN_LT,
@@ -86,6 +89,7 @@ typedef enum
   TOKEN_GTEQ,
   TOKEN_EQEQ,
   TOKEN_BANGEQ,
+  TOKEN_BANGTILDE,
 
   TOKEN_BREAK,
   TOKEN_CONTINUE,
@@ -108,6 +112,7 @@ typedef enum
   TOKEN_TRUE,
   TOKEN_VAR,
   TOKEN_WHILE,
+  TOKEN_SWITCH,
 
   TOKEN_FIELD,
   TOKEN_STATIC_FIELD,
@@ -620,6 +625,7 @@ static Keyword keywords[] =
   {"true",      4, TOKEN_TRUE},
   {"var",       3, TOKEN_VAR},
   {"while",     5, TOKEN_WHILE},
+  {"switch",    6, TOKEN_SWITCH},
   {NULL,        0, TOKEN_EOF} // Sentinel to mark the end of the array.
 };
 
@@ -869,7 +875,7 @@ static int readHexEscape(Parser* parser, int digits, const char* description)
       break;
     }
 
-    value = (value * 16) | digit;
+    value = (value << 4) | digit;
   }
 
   return value;
@@ -1109,13 +1115,34 @@ static void nextToken(Parser* parser)
       case '^': makeToken(parser, TOKEN_CARET); return;
       case '+': makeToken(parser, TOKEN_PLUS); return;
       case '-': makeToken(parser, TOKEN_MINUS); return;
-      case '~': makeToken(parser, TOKEN_TILDE); return;
+      case '~': twoCharToken(parser, '~', TOKEN_TILDETILDE, TOKEN_TILDE); return;
       case '?': makeToken(parser, TOKEN_QUESTION); return;
         
-      case '|': twoCharToken(parser, '|', TOKEN_PIPEPIPE, TOKEN_PIPE); return;
+      case '|':
+        if (peekChar(parser) == '>') {
+          matchChar(parser, '>');
+          makeToken(parser, TOKEN_PIPEOPERATOR);
+          return;
+        }
+        twoCharToken(parser, '|', TOKEN_PIPEPIPE, TOKEN_PIPE);
+        return;
       case '&': twoCharToken(parser, '&', TOKEN_AMPAMP, TOKEN_AMP); return;
       case '=': twoCharToken(parser, '=', TOKEN_EQEQ, TOKEN_EQ); return;
-      case '!': twoCharToken(parser, '=', TOKEN_BANGEQ, TOKEN_BANG); return;
+
+      case '!':
+        if (matchChar(parser, '='))
+        {
+          makeToken(parser, TOKEN_BANGEQ);
+        }
+        else if (matchChar(parser, '~'))
+        {
+          makeToken(parser, TOKEN_BANGTILDE);
+        }
+        else
+        {
+          makeToken(parser, TOKEN_BANG);
+        }
+        return;
         
       case '.':
         if (matchChar(parser, '.'))
@@ -1713,10 +1740,11 @@ typedef enum
   PREC_NONE,
   PREC_LOWEST,
   PREC_ASSIGNMENT,    // =
+  PREC_PIPEOPERATOR,  // |>
   PREC_CONDITIONAL,   // ?:
   PREC_LOGICAL_OR,    // ||
   PREC_LOGICAL_AND,   // &&
-  PREC_EQUALITY,      // == !=
+  PREC_EQUALITY,      // == != ~~ !~
   PREC_IS,            // is
   PREC_COMPARISON,    // < > <= >=
   PREC_BITWISE_OR,    // |
@@ -1726,7 +1754,7 @@ typedef enum
   PREC_RANGE,         // .. ...
   PREC_TERM,          // + -
   PREC_FACTOR,        // * / %
-  PREC_UNARY,         // unary - ! ~
+  PREC_UNARY,         // unary - + ! ~
   PREC_CALL,          // . () []
   PREC_PRIMARY
 } Precedence;
@@ -1999,6 +2027,31 @@ static void callMethod(Compiler* compiler, int numArgs, const char* name,
   emitShortArg(compiler, (Code)(CODE_CALL_0 + numArgs), symbol);
 }
 
+// Compiles a function literal in braces.  [name] and [nameLength] are the
+// name the function will be given.
+static void functionLiteral(Compiler* compiler,
+                            const char* name, int nameLength)
+{
+    Compiler fnCompiler;
+    initCompiler(&fnCompiler, compiler->parser, compiler, false);
+
+    // Make a dummy signature to track the arity.
+    Signature fnSignature = { "", 0, SIG_METHOD, 0 };
+
+    // Parse the parameter list, if any.
+    if (match(compiler, TOKEN_PIPE))
+    {
+      finishParameterList(&fnCompiler, &fnSignature);
+      consume(compiler, TOKEN_PIPE, "Expect '|' after function parameters.");
+    }
+
+    fnCompiler.fn->arity = fnSignature.arity;
+
+    finishBody(&fnCompiler);
+
+    endCompiler(&fnCompiler, name, nameLength);
+}
+
 // Compiles an (optional) argument list for a method call with [methodSignature]
 // and then calls it.
 static void methodCall(Compiler* compiler, Code instruction,
@@ -2031,30 +2084,13 @@ static void methodCall(Compiler* compiler, Code instruction,
     called.type = SIG_METHOD;
     called.arity++;
 
-    Compiler fnCompiler;
-    initCompiler(&fnCompiler, compiler->parser, compiler, false);
-
-    // Make a dummy signature to track the arity.
-    Signature fnSignature = { "", 0, SIG_METHOD, 0 };
-
-    // Parse the parameter list, if any.
-    if (match(compiler, TOKEN_PIPE))
-    {
-      finishParameterList(&fnCompiler, &fnSignature);
-      consume(compiler, TOKEN_PIPE, "Expect '|' after function parameters.");
-    }
-
-    fnCompiler.fn->arity = fnSignature.arity;
-
-    finishBody(&fnCompiler);
-
-    // Name the function based on the method its passed to.
-    char blockName[MAX_METHOD_SIGNATURE + 15];
+    // Name the function based on the method it's passed to.
+    char blockName[MAX_METHOD_SIGNATURE + 16];
     int blockLength;
     signatureToString(&called, blockName, &blockLength);
     memmove(blockName + blockLength, " block argument", 16);
 
-    endCompiler(&fnCompiler, blockName, blockLength + 15);
+    functionLiteral(compiler, blockName, blockLength + 15);
   }
 
   // TODO: Allow Grace-style mixfix methods?
@@ -2251,10 +2287,6 @@ static void field(Compiler* compiler, bool canAssign)
   {
     error(compiler, "Cannot reference a field outside of a class definition.");
   }
-  else if (enclosingClass->isForeign)
-  {
-    error(compiler, "Cannot define fields in a foreign class.");
-  }
   else if (enclosingClass->inStatic)
   {
     error(compiler, "Cannot use an instance field in a static method.");
@@ -2435,31 +2467,35 @@ static void literal(Compiler* compiler, bool canAssign)
 //     ["a ", b + c, " d"].join()
 static void stringInterpolation(Compiler* compiler, bool canAssign)
 {
-  // Instantiate a new list.
-  loadCoreVariable(compiler, "List");
-  callMethod(compiler, 0, "new()", 5);
-  
+  bool first = true;
   do
   {
     // The opening string part.
-    literal(compiler, false);
-    callMethod(compiler, 1, "addCore_(_)", 11);
+    if (AS_STRING(compiler->parser->previous.value)->length != 0)
+    {
+      literal(compiler, false);
+      if (!first) callMethod(compiler, 1, "+(_)", 4);
+      first = false;
+    }
     
     // The interpolated expression.
     ignoreNewlines(compiler);
     expression(compiler);
-    callMethod(compiler, 1, "addCore_(_)", 11);
+    callMethod(compiler, 0, "toString", 8);
+    if (!first) callMethod(compiler, 1, "+(_)", 4);
+    first = false;
     
     ignoreNewlines(compiler);
   } while (match(compiler, TOKEN_INTERPOLATION));
   
   // The trailing string part.
   consume(compiler, TOKEN_STRING, "Expect end of string interpolation.");
-  literal(compiler, false);
-  callMethod(compiler, 1, "addCore_(_)", 11);
-  
-  // The list of interpolated parts.
-  callMethod(compiler, 0, "join()", 6);
+  if (AS_STRING(compiler->parser->previous.value)->length != 0)
+  {
+    literal(compiler, false);
+    ASSERT(!first, "Lexer error: invalid string interpolation token chain");
+    callMethod(compiler, 1, "+(_)", 4);
+  }
 }
 
 static void super_(Compiler* compiler, bool canAssign)
@@ -2589,6 +2625,11 @@ void infixOp(Compiler* compiler, bool canAssign)
 
   // Compile the right-hand side.
   parsePrecedence(compiler, (Precedence)(rule->precedence + 1));
+
+  if (rule->name[1] == '~') // smartmatch
+  {
+    emitOp(compiler, CODE_SWAP);
+  }
 
   // Call the operator method on the left-hand side.
   Signature signature = { rule->name, (int)strlen(rule->name), SIG_METHOD, 1 };
@@ -2746,6 +2787,7 @@ void constructorSignature(Compiler* compiler, Signature* signature)
 #define PREFIX_OPERATOR(name)      { unaryOp, NULL, unarySignature, PREC_NONE, name }
 #define OPERATOR(name)             { unaryOp, infixOp, mixedSignature, PREC_TERM, name }
 
+// CAUTION: if you change this, also update the TokenType enum above.
 GrammarRule rules[] =
 {
   /* TOKEN_LEFT_PAREN    */ PREFIX(grouping),
@@ -2763,17 +2805,19 @@ GrammarRule rules[] =
   /* TOKEN_SLASH         */ INFIX_OPERATOR(PREC_FACTOR, "/"),
   /* TOKEN_PERCENT       */ INFIX_OPERATOR(PREC_FACTOR, "%"),
   /* TOKEN_HASH          */ UNUSED,
-  /* TOKEN_PLUS          */ INFIX_OPERATOR(PREC_TERM, "+"),
+  /* TOKEN_PLUS          */ OPERATOR("+"),
   /* TOKEN_MINUS         */ OPERATOR("-"),
   /* TOKEN_LTLT          */ INFIX_OPERATOR(PREC_BITWISE_SHIFT, "<<"),
   /* TOKEN_GTGT          */ INFIX_OPERATOR(PREC_BITWISE_SHIFT, ">>"),
   /* TOKEN_PIPE          */ INFIX_OPERATOR(PREC_BITWISE_OR, "|"),
   /* TOKEN_PIPEPIPE      */ INFIX(PREC_LOGICAL_OR, or_),
+  /* TOKEN_PIPEOPERATOR  */ INFIX_OPERATOR(PREC_PIPEOPERATOR, "|>"),
   /* TOKEN_CARET         */ INFIX_OPERATOR(PREC_BITWISE_XOR, "^"),
   /* TOKEN_AMP           */ INFIX_OPERATOR(PREC_BITWISE_AND, "&"),
   /* TOKEN_AMPAMP        */ INFIX(PREC_LOGICAL_AND, and_),
   /* TOKEN_BANG          */ PREFIX_OPERATOR("!"),
   /* TOKEN_TILDE         */ PREFIX_OPERATOR("~"),
+  /* TOKEN_TILDETILDE    */ INFIX_OPERATOR(PREC_EQUALITY, "~~"),
   /* TOKEN_QUESTION      */ INFIX(PREC_ASSIGNMENT, conditional),
   /* TOKEN_EQ            */ UNUSED,
   /* TOKEN_LT            */ INFIX_OPERATOR(PREC_COMPARISON, "<"),
@@ -2782,6 +2826,7 @@ GrammarRule rules[] =
   /* TOKEN_GTEQ          */ INFIX_OPERATOR(PREC_COMPARISON, ">="),
   /* TOKEN_EQEQ          */ INFIX_OPERATOR(PREC_EQUALITY, "=="),
   /* TOKEN_BANGEQ        */ INFIX_OPERATOR(PREC_EQUALITY, "!="),
+  /* TOKEN_BANGTILDE     */ INFIX_OPERATOR(PREC_EQUALITY, "!~"),
   /* TOKEN_BREAK         */ UNUSED,
   /* TOKEN_CONTINUE      */ UNUSED,
   /* TOKEN_CLASS         */ UNUSED,
@@ -2803,6 +2848,7 @@ GrammarRule rules[] =
   /* TOKEN_TRUE          */ PREFIX(boolean),
   /* TOKEN_VAR           */ UNUSED,
   /* TOKEN_WHILE         */ UNUSED,
+  /* TOKEN_SWITCH        */ UNUSED,
   /* TOKEN_FIELD         */ PREFIX(field),
   /* TOKEN_STATIC_FIELD  */ PREFIX(staticField),
   /* TOKEN_NAME          */ { name, NULL, namedSignature, PREC_NONE, NULL },
@@ -2883,9 +2929,9 @@ static int getByteCountForArguments(const uint8_t* bytecode,
     case CODE_LOAD_LOCAL_8:
     case CODE_CONSTRUCT:
     case CODE_FOREIGN_CONSTRUCT:
-    case CODE_FOREIGN_CLASS:
     case CODE_END_MODULE:
     case CODE_END_CLASS:
+    case CODE_SWAP:
       return 0;
 
     case CODE_LOAD_LOCAL:
@@ -2897,6 +2943,7 @@ static int getByteCountForArguments(const uint8_t* bytecode,
     case CODE_LOAD_FIELD:
     case CODE_STORE_FIELD:
     case CODE_CLASS:
+    case CODE_FOREIGN_CLASS:
       return 1;
 
     case CODE_CONSTANT:
@@ -3166,6 +3213,126 @@ static void whileStatement(Compiler* compiler)
   endLoop(compiler);
 }
 
+// Switch: a series of (topic ~~ test) conditions.
+// This follows the same pattern as forStatement().  A switch like:
+//
+//     switch (topic) {
+//       "case 1": {
+//         var n = 1
+//         System.print(n)
+//       }
+//       "case 2": System.print(2)
+//       else: System.print("nope")
+//     }
+//
+// is compiled to bytecode almost as if the source looked like this:
+//
+//     {
+//       var topic_ = topic
+//       if(topic_ ~~ "case 1") {
+//         var n = 1
+//         System.print(n)
+//       } else if(topic_ ~~ "case 2") {
+//         System.print(2)
+//       } else {
+//         System.print("nope")
+//       }
+//     }
+static void switchStatement(Compiler* compiler)
+{
+  Signature smartmatch = { "~~", 2, SIG_METHOD, 1 };
+  IntBuffer cases;
+  wrenIntBufferInit(&cases);
+
+  // Create a scope for the hidden local variable used for the topic.
+  pushScope(compiler);
+
+  // Verify that there is space for the hidden local variable.
+  if (compiler->numLocals + 1 > MAX_LOCALS)
+  {
+    error(compiler,
+          "Cannot declare more than %d variables in one scope. (Not enough "
+          "space for switch-statement internal variables)",
+          MAX_LOCALS);
+    return;
+  }
+
+  // Compile the topic expresssion
+  consume(compiler, TOKEN_LEFT_PAREN, "Expect '(' after 'switch'.");
+  expression(compiler);
+  int topicSlot = addLocal(compiler, "topic ", 6);
+
+  consume(compiler, TOKEN_RIGHT_PAREN, "Expect ')' after switch topic.");
+  consume(compiler, TOKEN_LEFT_BRACE, "Expect '{' after switch topic.");
+  consumeLine(compiler, "Expect newline after '{' starting switch statement.");
+
+  while (!compiler->parser->hasError)
+  {
+    if (match(compiler, TOKEN_ELSE))
+    {
+      // optional colon after `else` for ergonomics
+      match(compiler, TOKEN_COLON);
+
+      statement(compiler);
+      consumeLine(compiler, "Expect newline after switch case.");
+      break;
+    }
+
+    if (peek(compiler) == TOKEN_RIGHT_BRACE)
+    {
+      break;
+    }
+
+    // Normal case: emit topic ~~ test
+    if (match(compiler, TOKEN_LEFT_BRACE))
+    {
+      if (peek(compiler) != TOKEN_PIPE)
+      {
+        error(compiler, "Hash literals are not allowed in switch cases.  Please use a list of the hash keys instead.");
+      }
+
+      functionLiteral(compiler, "switch test", 11); // 11 = string length
+    }
+    else
+    {
+      expression(compiler);
+    }
+
+    // Now we have loaded test, which is the invocant.  Load the topic as
+    // the parameter to the test's smartmatch, and ask the test whether the
+    // topic matches.
+    loadLocal(compiler, topicSlot);
+    callSignature(compiler, CODE_CALL_0, &smartmatch);
+
+    consume(compiler, TOKEN_COLON, "Expect ':' after switch expression.");
+
+    // Jump to the next case if the condition is false.
+    int nextCaseJump = emitJump(compiler, CODE_JUMP_IF);
+    statement(compiler);
+
+    // jump past the rest of the cases
+    int toEndJump = emitJump(compiler, CODE_JUMP);
+    wrenIntBufferWrite(compiler->parser->vm, &cases, toEndJump);
+
+    patchJump(compiler, nextCaseJump);
+
+    consumeLine(compiler, "Expect newline after switch case.");
+  }
+
+  // Point all the end-of-case jumps here
+  for (int i=0; i<cases.count; ++i)
+  {
+    patchJump(compiler, cases.data[i]);
+  }
+
+  consume(compiler, TOKEN_RIGHT_BRACE, "Expect '}' after switch body.");
+
+  // Hidden variables.
+  popScope(compiler);
+
+  wrenIntBufferClear(compiler->parser->vm, &cases);
+}
+
 // Compiles a simple statement. These can only appear at the top-level or
 // within curly blocks. Simple statements exclude variable binding statements
 // like "var" and "class" which are not allowed directly in places like the
@@ -3242,6 +3409,10 @@ void statement(Compiler* compiler)
   else if (match(compiler, TOKEN_WHILE))
   {
     whileStatement(compiler);
+  }
+  else if (match(compiler, TOKEN_SWITCH))
+  {
+    switchStatement(compiler);
   }
   else if (match(compiler, TOKEN_LEFT_BRACE))
   {
@@ -3541,15 +3712,8 @@ static void classDefinition(Compiler* compiler, bool isForeign)
 
   // Store a placeholder for the number of fields argument. We don't know the
   // count until we've compiled all the methods to see which fields are used.
-  int numFieldsInstruction = -1;
-  if (isForeign)
-  {
-    emitOp(compiler, CODE_FOREIGN_CLASS);
-  }
-  else
-  {
-    numFieldsInstruction = emitByteArg(compiler, CODE_CLASS, 255);
-  }
+  Code code = isForeign ? CODE_FOREIGN_CLASS : CODE_CLASS;
+  int numFieldsInstruction = emitByteArg(compiler, code, 255);
 
   // Store it in its name.
   defineVariable(compiler, classVariable.index);
@@ -3612,11 +3776,8 @@ static void classDefinition(Compiler* compiler, bool isForeign)
   }
 
   // Update the class with the number of fields.
-  if (!isForeign)
-  {
-    compiler->fn->code.data[numFieldsInstruction] =
-        (uint8_t)classInfo.fields.count;
-  }
+  compiler->fn->code.data[numFieldsInstruction] =
+      (uint8_t)classInfo.fields.count;
   
   // Clear symbol tables for tracking field and method names.
   wrenSymbolTableClear(compiler->parser->vm, &classInfo.fields);
@@ -3765,7 +3926,7 @@ ObjFn* wrenCompile(WrenVM* vm, ObjModule* module, const char* source,
   // Skip the UTF-8 BOM if there is one.
   if (strncmp(source, "\xEF\xBB\xBF", 3) == 0) source += 3;
   
-  Parser parser;
+  Parser parser = {};
   parser.vm = vm;
   parser.module = module;
   parser.source = source;

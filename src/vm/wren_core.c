@@ -30,6 +30,18 @@ DEF_PRIMITIVE(bool_toString)
   }
 }
 
+DEF_PRIMITIVE(bool_toCNum)
+{
+    if (AS_BOOL(args[0]))
+    {
+        RETURN_NUM(1);
+    }
+    else
+    {
+        RETURN_NUM(0);
+    }
+}
+
 DEF_PRIMITIVE(class_name)
 {
   RETURN_OBJ(AS_CLASS(args[0])->name);
@@ -53,6 +65,51 @@ DEF_PRIMITIVE(class_toString)
 DEF_PRIMITIVE(class_attributes)
 {
   RETURN_VAL(AS_CLASS(args[0])->attributes);
+}
+
+// This is very similar to object_is(), but also permits subclass testing.
+DEF_PRIMITIVE(class_tildetilde)
+{
+  if (!IS_CLASS(args[0]))
+  {
+    RETURN_ERROR("Right operand must be a class.");
+  }
+
+  ObjClass *classObj = IS_CLASS(args[1]) ? AS_CLASS(args[1]) : wrenGetClass(vm, args[1]);
+  ObjClass *baseClassObj = AS_CLASS(args[0]);
+
+  // Walk the superclass chain looking for the class.
+  do
+  {
+    if (baseClassObj == classObj) RETURN_BOOL(true);
+
+    classObj = classObj->superclass;
+  }
+  while (classObj != NULL);
+
+  RETURN_BOOL(false);
+}
+
+DEF_PRIMITIVE(class_bangtilde)
+{
+  if (!IS_CLASS(args[0]))
+  {
+    RETURN_ERROR("Right operand must be a class.");
+  }
+
+  ObjClass *classObj = IS_CLASS(args[1]) ? AS_CLASS(args[1]) : wrenGetClass(vm, args[1]);
+  ObjClass *baseClassObj = AS_CLASS(args[0]);
+
+  // Walk the superclass chain looking for the class.
+  do
+  {
+    if (baseClassObj == classObj) RETURN_BOOL(false);
+
+    classObj = classObj->superclass;
+  }
+  while (classObj != NULL);
+
+  RETURN_BOOL(true);
 }
 
 DEF_PRIMITIVE(fiber_new)
@@ -297,6 +354,13 @@ DEF_PRIMITIVE(fn_toString)
   RETURN_VAL(CONST_STRING(vm, "<fn>"));
 }
 
+// Fn smartmatch is the same as one-arg call
+DEF_PRIMITIVE(fn_tildetilde)
+{
+  call_fn(vm, args, 1);
+  return false;
+}
+
 // Creates a new list of size args[1], with all elements initialized to args[2].
 DEF_PRIMITIVE(list_filled)
 {
@@ -513,11 +577,20 @@ DEF_PRIMITIVE(map_clear)
   RETURN_NULL;
 }
 
+// Map containsKey(_) and smartmatch
 DEF_PRIMITIVE(map_containsKey)
 {
   if (!validateKey(vm, args[1])) return false;
 
   RETURN_BOOL(!IS_UNDEFINED(wrenMapGet(AS_MAP(args[0]), args[1])));
+}
+
+// ! Map.containsKey(_)
+DEF_PRIMITIVE(map_bangtilde)
+{
+  if (!validateKey(vm, args[1])) return false;
+
+  RETURN_BOOL(IS_UNDEFINED(wrenMapGet(AS_MAP(args[0]), args[1])));
 }
 
 DEF_PRIMITIVE(map_count)
@@ -697,6 +770,7 @@ DEF_NUM_FN(ceil,    ceil)
 DEF_NUM_FN(cos,     cos)
 DEF_NUM_FN(floor,   floor)
 DEF_NUM_FN(negate,  -)
+DEF_NUM_FN(positive,+)
 DEF_NUM_FN(round,   round)
 DEF_NUM_FN(sin,     sin)
 DEF_NUM_FN(sqrt,    sqrt)
@@ -711,6 +785,7 @@ DEF_PRIMITIVE(num_mod)
   RETURN_NUM(fmod(AS_NUM(args[0]), AS_NUM(args[1])));
 }
 
+// Num equality and smartmatch
 DEF_PRIMITIVE(num_eqeq)
 {
   if (!IS_NUM(args[1])) RETURN_FALSE;
@@ -836,6 +911,18 @@ DEF_PRIMITIVE(num_toString)
   RETURN_VAL(wrenNumToString(vm, AS_NUM(args[0])));
 }
 
+DEF_PRIMITIVE(num_toCBool)
+{
+  if (AS_NUM(args[0]) != 0)
+  {
+    RETURN_TRUE;
+  }
+  else
+  {
+    RETURN_FALSE;
+  }
+}
+
 DEF_PRIMITIVE(num_truncate)
 {
   double integer;
@@ -853,6 +940,9 @@ DEF_PRIMITIVE(object_not)
   RETURN_VAL(FALSE_VAL);
 }
 
+// Equality and smartmatch for objects.
+// These two have opposite orders of arguments.  However, that doesn't matter
+// for a symmetric equality check.
 DEF_PRIMITIVE(object_eqeq)
 {
   RETURN_BOOL(wrenValuesEqual(args[0], args[1]));
@@ -1164,6 +1254,9 @@ DEF_PRIMITIVE(string_startsWith)
 DEF_PRIMITIVE(string_plus)
 {
   if (!validateString(vm, args[1], "Right operand")) return false;
+
+  if (AS_STRING(args[0])->length == 0) RETURN_VAL(args[1]);
+  if (AS_STRING(args[1])->length == 0) RETURN_VAL(args[0]);
   RETURN_VAL(wrenStringFormat(vm, "@@", args[0], args[1]));
 }
 
@@ -1224,7 +1317,7 @@ static ObjClass* defineClass(WrenVM* vm, ObjModule* module, const char* name)
   ObjString* nameString = AS_STRING(wrenNewString(vm, name));
   wrenPushRoot(vm, (Obj*)nameString);
 
-  ObjClass* classObj = wrenNewSingleClass(vm, 0, nameString);
+  ObjClass* classObj = wrenNewSingleClass(vm, false, 0, nameString);
 
   wrenDefineVariable(vm, module, name, nameString->length, OBJ_VAL(classObj), NULL);
 
@@ -1246,7 +1339,9 @@ void wrenInitializeCore(WrenVM* vm)
   vm->objectClass = defineClass(vm, coreModule, "Object");
   PRIMITIVE(vm->objectClass, "!", object_not);
   PRIMITIVE(vm->objectClass, "==(_)", object_eqeq);
+  PRIMITIVE(vm->objectClass, "~~(_)", object_eqeq);
   PRIMITIVE(vm->objectClass, "!=(_)", object_bangeq);
+  PRIMITIVE(vm->objectClass, "!~(_)", object_bangeq);
   PRIMITIVE(vm->objectClass, "is(_)", object_is);
   PRIMITIVE(vm->objectClass, "toString", object_toString);
   PRIMITIVE(vm->objectClass, "type", object_type);
@@ -1258,6 +1353,8 @@ void wrenInitializeCore(WrenVM* vm)
   PRIMITIVE(vm->classClass, "supertype", class_supertype);
   PRIMITIVE(vm->classClass, "toString", class_toString);
   PRIMITIVE(vm->classClass, "attributes", class_attributes);
+  PRIMITIVE(vm->classClass, "~~(_)", class_tildetilde);
+  PRIMITIVE(vm->classClass, "!~(_)", class_bangtilde);
 
   // Finally, we can define Object's metaclass which is a subclass of Class.
   ObjClass* objectMetaclass = defineClass(vm, coreModule, "Object metaclass");
@@ -1300,6 +1397,7 @@ void wrenInitializeCore(WrenVM* vm)
 
   vm->boolClass = AS_CLASS(wrenFindVariable(vm, coreModule, "Bool"));
   PRIMITIVE(vm->boolClass, "toString", bool_toString);
+  PRIMITIVE(vm->boolClass, "toCNum", bool_toCNum);
   PRIMITIVE(vm->boolClass, "!", bool_not);
 
   vm->fiberClass = AS_CLASS(wrenFindVariable(vm, coreModule, "Fiber"));
@@ -1343,6 +1441,8 @@ void wrenInitializeCore(WrenVM* vm)
   FUNCTION_CALL(vm->fnClass, "call(_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_)", fn_call16);
   
   PRIMITIVE(vm->fnClass, "toString", fn_toString);
+  PRIMITIVE(vm->fnClass, "~~(_)", fn_tildetilde);
+  // Fn.!~(_) is in wren_core.wren
 
   vm->nullClass = AS_CLASS(wrenFindVariable(vm, coreModule, "Null"));
   PRIMITIVE(vm->nullClass, "!", null_not);
@@ -1380,6 +1480,7 @@ void wrenInitializeCore(WrenVM* vm)
   PRIMITIVE(vm->numClass, "cos", num_cos);
   PRIMITIVE(vm->numClass, "floor", num_floor);
   PRIMITIVE(vm->numClass, "-", num_negate);
+  PRIMITIVE(vm->numClass, "+", num_positive);
   PRIMITIVE(vm->numClass, "round", num_round);
   PRIMITIVE(vm->numClass, "min(_)", num_min);
   PRIMITIVE(vm->numClass, "max(_)", num_max);
@@ -1402,17 +1503,22 @@ void wrenInitializeCore(WrenVM* vm)
   PRIMITIVE(vm->numClass, "isNan", num_isNan);
   PRIMITIVE(vm->numClass, "sign", num_sign);
   PRIMITIVE(vm->numClass, "toString", num_toString);
+  PRIMITIVE(vm->numClass, "toCBool", num_toCBool);
   PRIMITIVE(vm->numClass, "truncate", num_truncate);
 
   // These are defined just so that 0 and -0 are equal, which is specified by
   // IEEE 754 even though they have different bit representations.
   PRIMITIVE(vm->numClass, "==(_)", num_eqeq);
   PRIMITIVE(vm->numClass, "!=(_)", num_bangeq);
+  PRIMITIVE(vm->numClass, "~~(_)", num_eqeq);   // Num smartmatch is value equality
+  PRIMITIVE(vm->numClass, "!~(_)", num_bangeq);
 
   vm->stringClass = AS_CLASS(wrenFindVariable(vm, coreModule, "String"));
   PRIMITIVE(vm->stringClass->obj.classObj, "fromCodePoint(_)", string_fromCodePoint);
   PRIMITIVE(vm->stringClass->obj.classObj, "fromByte(_)", string_fromByte);
   PRIMITIVE(vm->stringClass, "+(_)", string_plus);
+  PRIMITIVE(vm->stringClass, "~~(_)", object_eqeq);   // because String is Sequence
+  PRIMITIVE(vm->stringClass, "!~(_)", object_bangeq);
   PRIMITIVE(vm->stringClass, "[_]", string_subscript);
   PRIMITIVE(vm->stringClass, "byteAt_(_)", string_byteAt);
   PRIMITIVE(vm->stringClass, "byteCount_", string_byteCount);
@@ -1451,6 +1557,8 @@ void wrenInitializeCore(WrenVM* vm)
   PRIMITIVE(vm->mapClass, "addCore_(_,_)", map_addCore);
   PRIMITIVE(vm->mapClass, "clear()", map_clear);
   PRIMITIVE(vm->mapClass, "containsKey(_)", map_containsKey);
+  PRIMITIVE(vm->mapClass, "~~(_)", map_containsKey);
+  PRIMITIVE(vm->mapClass, "!~(_)", map_bangtilde);
   PRIMITIVE(vm->mapClass, "count", map_count);
   PRIMITIVE(vm->mapClass, "remove(_)", map_remove);
   PRIMITIVE(vm->mapClass, "iterate(_)", map_iterate);
