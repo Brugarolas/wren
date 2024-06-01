@@ -58,6 +58,9 @@ struct WrenVM
 
   // Memory management data:
 
+  // The lock that prevent garbage collection to re-enter.
+  bool lockGC;
+
   // The number of bytes that are known to be currently allocated. Includes all
   // memory that was proven live after the last GC, as well as any new bytes
   // that were allocated since then. Does *not* include bytes for objects that
@@ -132,7 +135,7 @@ struct WrenVM
 void* wrenReallocate(WrenVM* vm, void* memory, size_t oldSize, size_t newSize);
 
 // Invoke the finalizer for the foreign object referenced by [foreign].
-void wrenFinalizeForeign(WrenVM* vm, ObjForeign* foreign);
+void wrenFinalizeForeign(WrenVM* vm, ObjMemorySegment* foreign);
 
 // Creates a new [WrenHandle] for [value].
 WrenHandle* wrenMakeHandle(WrenVM* vm, Value value);
