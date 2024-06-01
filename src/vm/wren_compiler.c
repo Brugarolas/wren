@@ -3494,6 +3494,8 @@ static void createConstructor(Compiler* compiler, Signature* signature,
   Compiler methodCompiler;
   initCompiler(&methodCompiler, compiler->parser, compiler, true);
   
+  methodCompiler.fn->arity = signature->arity;
+
   // Allocate the instance.
   emitOp(&methodCompiler, compiler->enclosingClass->isForeign
        ? CODE_FOREIGN_CONSTRUCT : CODE_CONSTRUCT);
@@ -3674,6 +3676,8 @@ static bool method(Compiler* compiler, Variable classVariable)
     error(compiler, "A constructor cannot be static.");
   }
   
+  methodCompiler.fn->arity = signature.arity;
+
   // Include the full signature in debug messages in stack traces.
   char fullSignature[MAX_METHOD_SIGNATURE];
   int length;
