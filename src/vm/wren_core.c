@@ -989,6 +989,11 @@ DEF_PRIMITIVE(object_is)
   RETURN_BOOL(false);
 }
 
+DEF_PRIMITIVE(object_hash)
+{
+  RETURN_NUM(wrenHash(args[0]));
+}
+
 DEF_PRIMITIVE(object_toString)
 {
   Obj* obj = AS_OBJ(args[0]);
@@ -1355,6 +1360,7 @@ void wrenInitializeCore(WrenVM* vm)
   PRIMITIVE(vm->objectClass, "==(_)", object_eqeq);
   PRIMITIVE(vm->objectClass, "~~(_)", object_eqeq);
   PRIMITIVE(vm->objectClass, "!=(_)", object_bangeq);
+  PRIMITIVE(vm->objectClass, "hash", object_hash);
   PRIMITIVE(vm->objectClass, "!~(_)", object_bangeq);
   PRIMITIVE(vm->objectClass, "is(_)", object_is);
   PRIMITIVE(vm->objectClass, "toString", object_toString);
