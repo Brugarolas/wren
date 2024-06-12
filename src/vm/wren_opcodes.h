@@ -141,6 +141,10 @@ OPCODE(CLOSE_UPVALUE, -1)
 // stack.
 OPCODE(RETURN, 0)
 
+// Exit from the current function and return several values on the top of
+// the stack.
+OPCODE(RETURN_MULTIPLE, 0)
+
 // Creates a closure for the function stored at [arg] in the constant table.
 //
 // Following the function argument is a number of arguments, two for each
@@ -211,6 +215,9 @@ OPCODE(IMPORT_MODULE, 1)
 // variable to import is at [arg] in the constant table. Pushes the loaded
 // variable's value.
 OPCODE(IMPORT_VARIABLE, 1)
+
+// Swap the top two stack slots.
+OPCODE(SWAP, 0)
 
 // This pseudo-instruction indicates the end of the bytecode. It should
 // always be preceded by a `CODE_RETURN`, so is never actually executed.

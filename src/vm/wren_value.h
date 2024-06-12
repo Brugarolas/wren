@@ -50,10 +50,10 @@
 #define AS_CLOSURE(value)   ((ObjClosure*)AS_OBJ(value))        // ObjClosure*
 #define AS_FIBER(v)         ((ObjFiber*)AS_OBJ(v))              // ObjFiber*
 #define AS_FN(value)        ((ObjFn*)AS_OBJ(value))             // ObjFn*
-#define AS_FOREIGN(v)       ((ObjForeign*)AS_OBJ(v))            // ObjForeign*
-#define AS_INSTANCE(value)  ((ObjInstance*)AS_OBJ(value))       // ObjInstance*
 #define AS_LIST(value)      ((ObjList*)AS_OBJ(value))           // ObjList*
 #define AS_MAP(value)       ((ObjMap*)AS_OBJ(value))            // ObjMap*
+#define AS_MEMORYSEGMENT(value)        /* ObjMemorySegment* */                \
+    (ObjMemorySegment*)(AS_OBJ(value))
 #define AS_MODULE(value)    ((ObjModule*)AS_OBJ(value))         // ObjModule*
 #define AS_NUM(value)       (wrenValueToNum(value))             // double
 #define AS_RANGE(v)         ((ObjRange*)AS_OBJ(v))              // ObjRange*
@@ -78,6 +78,8 @@
 #define IS_INSTANCE(value) (wrenIsObjType(value, OBJ_INSTANCE)) // ObjInstance
 #define IS_LIST(value) (wrenIsObjType(value, OBJ_LIST))         // ObjList
 #define IS_MAP(value) (wrenIsObjType(value, OBJ_MAP))           // ObjMap
+#define IS_MEMORYSEGMENT(value)        /* ObjMemorySegment */                 \
+    (IS_FOREIGN(value) || IS_INSTANCE(value))
 #define IS_RANGE(value) (wrenIsObjType(value, OBJ_RANGE))       // ObjRange
 #define IS_STRING(value) (wrenIsObjType(value, OBJ_STRING))     // ObjString
 
@@ -154,6 +156,15 @@ typedef struct
 #endif
 
 DECLARE_BUFFER(Value, Value);
+
+typedef struct
+{
+  Obj obj;
+  size_t fieldsSize;
+  size_t dataSize;
+  Value fields[FLEXIBLE_ARRAY];
+//  uint8_t data[FLEXIBLE_ARRAY];
+} ObjMemorySegment;
 
 // A heap-allocated string object.
 struct sObjString
@@ -414,6 +425,8 @@ struct sObjClass
   Obj obj;
   ObjClass* superclass;
 
+  bool isForeign;
+
   // The number of fields needed for an instance of this class, including all
   // of its superclass fields.
   int numFields;
@@ -444,18 +457,6 @@ struct sObjClass
   // foreignMethodUserDatas.data[i].userData is readable.
   ForeignMethodUserDataBuffer foreignMethodUserDatas;
 };
-
-typedef struct
-{
-  Obj obj;
-  uint8_t data[FLEXIBLE_ARRAY];
-} ObjForeign;
-
-typedef struct
-{
-  Obj obj;
-  Value fields[FLEXIBLE_ARRAY];
-} ObjInstance;
 
 typedef struct
 {
@@ -493,7 +494,7 @@ typedef struct
 // for a key, we will continue past tombstones, because the desired key may be
 // found after them if the key that was removed was part of a prior collision.
 // When the array gets resized, all tombstones are discarded.
-typedef struct
+typedef struct sObjMap
 {
   Obj obj;
 
@@ -647,10 +648,37 @@ typedef struct
 
 #endif
 
+// Creates a new memory segment of the given [classObj].
+Value wrenNewMemorySegment(WrenVM* vm, ObjType type, ObjClass* classObj,
+                           size_t fieldsSize, size_t dataSize);
+
+static inline size_t wrenMemorySegmentAllocatedSize(const ObjMemorySegment *ms)
+{
+  return sizeof(ObjMemorySegment) +
+      sizeof(Value) * ms->fieldsSize +
+      ms->dataSize;
+}
+
+static inline Value *wrenMemorySegmentAt(ObjMemorySegment *ms, size_t index)
+{
+  ASSERT(ms != NULL, "Unexpected NULL memory segment.");
+  ASSERT(index < ms->fieldsSize, "Out of bounds field.");
+
+  return &ms->fields[index];
+}
+
+static inline void *wrenMemorySegmentData(ObjMemorySegment *ms)
+{
+  ASSERT(ms != NULL, "Unexpected NULL memory segment.");
+
+  return &ms->fields[ms->fieldsSize];
+}
+
 // Creates a new "raw" class. It has no metaclass or superclass whatsoever.
 // This is only used for bootstrapping the initial Object and Class classes,
 // which are a little special.
-ObjClass* wrenNewSingleClass(WrenVM* vm, int numFields, ObjString* name);
+ObjClass* wrenNewSingleClass(WrenVM* vm, bool isForeign, int numFields,
+                             ObjString* name);
 
 // Makes [superclass] the superclass of [subclass], and causes subclass to
 // inherit its methods. This should be called before any methods are defined
@@ -658,8 +686,8 @@ ObjClass* wrenNewSingleClass(WrenVM* vm, int numFields, ObjString* name);
 void wrenBindSuperclass(WrenVM* vm, ObjClass* subclass, ObjClass* superclass);
 
 // Creates a new class object as well as its associated metaclass.
-ObjClass* wrenNewClass(WrenVM* vm, ObjClass* superclass, int numFields,
-                       ObjString* name);
+ObjClass* wrenNewClass(WrenVM* vm, ObjClass* superclass, bool isForeign,
+                       int numFields, ObjString* name);
 
 // Add [method] as the [symbol]'th method of [classObj].  If [method]
 // is a foreign method, also save [userData].
@@ -695,7 +723,7 @@ static inline bool wrenHasError(const ObjFiber* fiber)
   return !IS_NULL(fiber->error);
 }
 
-ObjForeign* wrenNewForeign(WrenVM* vm, ObjClass* classObj, size_t size);
+ObjMemorySegment* wrenNewForeign(WrenVM* vm, ObjClass* classObj, size_t size);
 
 // Creates a new empty function. Before being used, it must have code,
 // constants, etc. added to it.
@@ -727,9 +755,15 @@ ObjMap* wrenNewMap(WrenVM* vm);
 // This separation exists to aid the API in surfacing errors to the developer as well.
 static inline bool wrenMapIsValidKey(Value arg);
 
+uint32_t wrenHash(Value value);
+
 // Looks up [key] in [map]. If found, returns the value. Otherwise, returns
 // `UNDEFINED_VAL`.
 Value wrenMapGet(ObjMap* map, Value key);
+
+MapEntry* wrenMapFindStrLength(ObjMap* map, const char *text, size_t length);
+
+Value wrenMapGetStrLength(ObjMap* map, const char *text, size_t length);
 
 // Associates [key] with [value] in [map].
 void wrenMapSet(WrenVM* vm, ObjMap* map, Value key, Value value);

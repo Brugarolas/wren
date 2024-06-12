@@ -105,6 +105,7 @@ GENERATED += $(OBJDIR)/wren_debug.o
 GENERATED += $(OBJDIR)/wren_opt_meta.o
 GENERATED += $(OBJDIR)/wren_opt_random.o
 GENERATED += $(OBJDIR)/wren_primitive.o
+GENERATED += $(OBJDIR)/wren_strtod.o
 GENERATED += $(OBJDIR)/wren_utils.o
 GENERATED += $(OBJDIR)/wren_value.o
 GENERATED += $(OBJDIR)/wren_vm.o
@@ -114,6 +115,7 @@ OBJECTS += $(OBJDIR)/wren_debug.o
 OBJECTS += $(OBJDIR)/wren_opt_meta.o
 OBJECTS += $(OBJDIR)/wren_opt_random.o
 OBJECTS += $(OBJDIR)/wren_primitive.o
+OBJECTS += $(OBJDIR)/wren_strtod.o
 OBJECTS += $(OBJDIR)/wren_utils.o
 OBJECTS += $(OBJDIR)/wren_value.o
 OBJECTS += $(OBJDIR)/wren_vm.o
@@ -196,6 +198,9 @@ $(OBJDIR)/wren_debug.o: ../../src/vm/wren_debug.c
 	@echo $(notdir $<)
 	$(SILENT) $(CC) $(ALL_CFLAGS) $(FORCE_INCLUDE) -o "$@" -MF "$(@:%.o=%.d)" -c "$<"
 $(OBJDIR)/wren_primitive.o: ../../src/vm/wren_primitive.c
+	@echo $(notdir $<)
+	$(SILENT) $(CC) $(ALL_CFLAGS) $(FORCE_INCLUDE) -o "$@" -MF "$(@:%.o=%.d)" -c "$<"
+$(OBJDIR)/wren_strtod.o: ../../src/vm/wren_strtod.c
 	@echo $(notdir $<)
 	$(SILENT) $(CC) $(ALL_CFLAGS) $(FORCE_INCLUDE) -o "$@" -MF "$(@:%.o=%.d)" -c "$<"
 $(OBJDIR)/wren_utils.o: ../../src/vm/wren_utils.c

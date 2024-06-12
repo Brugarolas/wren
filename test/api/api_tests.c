@@ -69,6 +69,9 @@ WrenBindForeignMethodResult APITest_bindForeignMethod(
     return foreignMethodUserData;
   }
 
+  method = multipleReturnValuesForeignBindMethod(fullName);
+  if (method != NULL) return method;
+
   fprintf(stderr,
       "Unknown foreign method '%s' for test '%s'\n", fullName, testName);
   exit(1);
