@@ -33,6 +33,7 @@
 
 DEFINE_BUFFER(Value, Value);
 DEFINE_BUFFER(Method, Method);
+DEFINE_BUFFER(ForeignMethodUserData, ForeignMethodUserData);
 
 static void initObj(WrenVM* vm, Obj* obj, ObjType type, ObjClass* classObj)
 {
@@ -80,6 +81,7 @@ ObjClass* wrenNewSingleClass(WrenVM* vm, bool isForeign, int numFields,
 
   wrenPushRoot(vm, (Obj*)classObj);
   wrenMethodBufferInit(&classObj->methods);
+  wrenForeignMethodUserDataBufferInit(&classObj->foreignMethodUserDatas);
   wrenPopRoot(vm);
 
   return classObj;
@@ -97,7 +99,13 @@ void wrenBindSuperclass(WrenVM* vm, ObjClass* subclass, ObjClass* superclass)
   // Inherit methods from its superclass.
   for (int i = 0; i < superclass->methods.count; i++)
   {
-    wrenBindMethod(vm, subclass, i, superclass->methods.data[i]);
+    // Grab foreign-method userdata from the superclass, if any
+    WrenUserData userData = WREN_USER_DATA_NONE;
+    if(superclass->methods.data[i].type == METHOD_FOREIGN) {
+      userData = superclass->foreignMethodUserDatas.data[i].userData;
+    }
+
+    wrenBindMethod(vm, subclass, i, superclass->methods.data[i], userData);
   }
 }
 
@@ -136,7 +144,8 @@ ObjClass* wrenNewClass(WrenVM* vm, ObjClass* superclass, bool isForeign,
   return classObj;
 }
 
-void wrenBindMethod(WrenVM* vm, ObjClass* classObj, int symbol, Method method)
+void wrenBindMethod(WrenVM* vm, ObjClass* classObj, int symbol, Method method,
+                    WrenUserData userData)
 {
   // Make sure the buffer is big enough to contain the symbol's index.
   if (symbol >= classObj->methods.count)
@@ -148,6 +157,16 @@ void wrenBindMethod(WrenVM* vm, ObjClass* classObj, int symbol, Method method)
   }
 
   classObj->methods.data[symbol] = method;
+
+  if(method.type == METHOD_FOREIGN) {
+    // Make sure the foreign userdata buffer is big enough.
+    ForeignMethodUserData noUserData;
+    noUserData.userData = WREN_USER_DATA_NONE;
+    wrenForeignMethodUserDataBufferFill(vm, &classObj->foreignMethodUserDatas,
+        noUserData, symbol - classObj->foreignMethodUserDatas.count + 1);
+
+    classObj->foreignMethodUserDatas.data[symbol].userData = userData;
+  }
 }
 
 ObjClosure* wrenNewClosure(WrenVM* vm, ObjFn* fn)
@@ -1299,6 +1318,7 @@ void wrenFreeObj(WrenVM* vm, Obj* obj)
   {
     case OBJ_CLASS:
       wrenMethodBufferClear(vm, &((ObjClass*)obj)->methods);
+      wrenForeignMethodUserDataBufferClear(vm, &((ObjClass*)obj)->foreignMethodUserDatas);
       break;
 
     case OBJ_FIBER:

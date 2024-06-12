@@ -6,18 +6,18 @@
 static int finalized = 0;
 static int uid = 0;
 
-static void apiFinalized(WrenVM* vm)
+static void apiFinalized(WrenVM* vm, void *userData)
 {
   wrenSetSlotDouble(vm, 0, finalized);
 }
 
-static void counterAllocate(WrenVM* vm)
+static void counterAllocate(WrenVM* vm, void *userData)
 {
   double* value = (double*)wrenSetSlotNewForeign(vm, 0, 0, sizeof(double));
   *value = 0;
 }
 
-static void counterIncrement(WrenVM* vm)
+static void counterIncrement(WrenVM* vm, void *userData)
 {
   double* value = (double*)wrenGetSlotForeign(vm, 0);
   double increment = wrenGetSlotDouble(vm, 1);
@@ -25,7 +25,7 @@ static void counterIncrement(WrenVM* vm)
   *value += increment;
 }
 
-static void counterValue(WrenVM* vm)
+static void counterValue(WrenVM* vm, void *userData)
 {
   double value = *(double*)wrenGetSlotForeign(vm, 0);
   wrenSetSlotDouble(vm, 0, value);
@@ -41,7 +41,7 @@ static void rogueFinalize(void* data)
   wrenCollectGarbage(*(WrenVM**)data);
 }
 
-static void pointAllocate(WrenVM* vm)
+static void pointAllocate(WrenVM* vm, void *userData)
 {
   double* coordinates = (double*)wrenSetSlotNewForeign(vm, 0, 0, sizeof(double[3]));
 
@@ -61,7 +61,7 @@ static void pointAllocate(WrenVM* vm)
   }
 }
 
-static void pointTranslate(WrenVM* vm)
+static void pointTranslate(WrenVM* vm, void *userData)
 {
   double* coordinates = (double*)wrenGetSlotForeign(vm, 0);
   coordinates[0] += wrenGetSlotDouble(vm, 1);
@@ -69,7 +69,7 @@ static void pointTranslate(WrenVM* vm)
   coordinates[2] += wrenGetSlotDouble(vm, 3);
 }
 
-static void pointToString(WrenVM* vm)
+static void pointToString(WrenVM* vm, void *userData)
 {
   double* coordinates = (double*)wrenGetSlotForeign(vm, 0);
   char result[100];
@@ -83,7 +83,7 @@ static void resourceCreateUid(WrenVM* vm)
   wrenSetSlotDouble(vm, 0, uid++);
 }
 
-static void resourceAllocate(WrenVM* vm)
+static void resourceAllocate(WrenVM* vm, void *userData)
 {
   int* value = (int*)wrenSetSlotNewForeign(vm, 0, 0, sizeof(int));
   *value = 123;
@@ -98,7 +98,7 @@ static void resourceFinalize(void* data)
   finalized++;
 }
 
-static void badClassAllocate(WrenVM* vm)
+static void badClassAllocate(WrenVM* vm, void *userData)
 {
   wrenEnsureSlots(vm, 1);
   wrenSetSlotString(vm, 0, "Something went wrong");
