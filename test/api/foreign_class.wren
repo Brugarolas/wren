@@ -16,6 +16,14 @@ System.print(counter.value) // expect: 3.1
 counter.increment(1.2)
 System.print(counter.value) // expect: 4.3
 
+// Class that calls wrenCollectGarbage at destruction
+foreign class Rogue {
+  construct new() { }
+}
+
+Rogue.new()
+System.gc()
+
 // Foreign classes can inherit a class as long as it has no fields.
 class PointBase {
   inherited() {
@@ -54,14 +62,32 @@ System.print(error) // expect: Class 'Subclass' cannot inherit from foreign clas
 
 // Class with a finalizer.
 foreign class Resource {
-  construct new() {}
+  construct new() {
+    _uid = Resource.createUid
+  }
+  uid { _uid }
+  foreign static createUid
+}
+
+// Class subclassing a class.
+foreign class TextureResource is Resource {
+  construct new() {
+    super()
+  }
 }
 
 var resources = [
   Resource.new(),
   Resource.new(),
-  Resource.new()
+  TextureResource.new()
 ]
+
+for (resource in resources) {
+  System.print("uid: %(resource.uid)")
+}
+// expect: uid: 0
+// expect: uid: 1
+// expect: uid: 2
 
 System.gc()
 System.print(ForeignClass.finalized) // expect: 0

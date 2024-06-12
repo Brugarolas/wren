@@ -58,6 +58,9 @@ struct WrenVM
 
   // Memory management data:
 
+  // The lock that prevent garbage collection to re-enter.
+  bool lockGC;
+
   // The number of bytes that are known to be currently allocated. Includes all
   // memory that was proven live after the last GC, as well as any new bytes
   // that were allocated since then. Does *not* include bytes for objects that
@@ -132,7 +135,7 @@ struct WrenVM
 void* wrenReallocate(WrenVM* vm, void* memory, size_t oldSize, size_t newSize);
 
 // Invoke the finalizer for the foreign object referenced by [foreign].
-void wrenFinalizeForeign(WrenVM* vm, ObjForeign* foreign);
+void wrenFinalizeForeign(WrenVM* vm, ObjMemorySegment* foreign);
 
 // Creates a new [WrenHandle] for [value].
 WrenHandle* wrenMakeHandle(WrenVM* vm, Value value);
@@ -187,12 +190,18 @@ static inline void wrenCallFunction(WrenVM* vm, ObjFiber* fiber,
     fiber->frameCapacity = max;
   }
   
+  // Functions allows to be called with more arguments than required. So the
+  // the [fiber] [stackTop] has to be realined to match the [closure] [arity].
+  const int closureNumArgs = closure->fn->arity + 1;
+  ASSERT(closureNumArgs <= numArgs, "Expect more arguments");
+  fiber->stackTop -= numArgs - closureNumArgs;
+
   // Grow the stack if needed.
   int stackSize = (int)(fiber->stackTop - fiber->stack);
   int needed = stackSize + closure->fn->maxSlots;
   wrenEnsureStack(vm, fiber, needed);
   
-  wrenAppendCallFrame(vm, fiber, closure, fiber->stackTop - numArgs);
+  wrenAppendCallFrame(vm, fiber, closure, fiber->stackTop - closureNumArgs);
 }
 
 // Marks [obj] as a GC root so that it doesn't get collected.

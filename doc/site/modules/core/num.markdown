@@ -194,6 +194,20 @@ The tangent of the number.
 
 The string representation of the number.
 
+### **toCBool**
+
+Converts the number to a Bool using the C99 language's notion of truth i.e. 0 (or -0) corresponds to `false` and any other number (including ±infinity and NaN) to `true`.
+
+Note that this differs from Wren's notion of truth where every number (including ±0) is considered to be true.
+
+<pre class="snippet">
+System.print((-0).toCBool)  //> false
+System.print((0).toCBool)   //> false
+System.print((0.8).toCBool) //> true
+System.print(1.toCBool)     //> true
+System.print((-2).toCBool)  //> true
+</pre>
+
 ### **truncate**
 
 Rounds the number to the nearest integer towards zero.
@@ -233,6 +247,15 @@ It is a runtime error if `denominator` is not a number.
 
 Compares this and `other`, returning `true` or `false` based on how the numbers
 are ordered. It is a runtime error if `other` is not a number.
+
+### **&lt;&lt;**(rhs), **&gt;&gt;**(rhs), **bitwiseShift**(rhs) operators
+
+Performs *bitwise* logical shift on the number. The number is first converted
+to a 32-bit unsigned value, which will truncate any floating point value. The
+bits of the result of that are then shifted, yielding the result.
+
+It is a runtime error if `other` is not a positive integer, unless using
+`bitwiseShift(rhs)` which accept any integer allowing left/right shifting.
 
 ### **~** operator
 
