@@ -514,6 +514,10 @@ WREN_API int wrenGetMapCount(WrenVM* vm, int slot);
 // Returns true if the key in [keySlot] is found in the map placed in [mapSlot].
 WREN_API bool wrenGetMapContainsKey(WrenVM* vm, int mapSlot, int keySlot);
 
+// Retrieves the value and key at element [index] from the map in [mapSlot] and
+// stores it in [keySlot] and [valueSlot].
+WREN_API void wrenGetMapKeyValueAt(WrenVM* vm, int mapSlot, int index, int keySlot, int valueSlot);
+
 // Retrieves a value with the key in [keySlot] from the map in [mapSlot] and
 // stores it in [valueSlot].
 WREN_API void wrenGetMapValue(WrenVM* vm, int mapSlot, int keySlot, int valueSlot);
@@ -527,6 +531,14 @@ WREN_API void wrenSetMapValue(WrenVM* vm, int mapSlot, int keySlot, int valueSlo
 // set to null, the same behaviour as the Wren Map API.
 WREN_API void wrenRemoveMapValue(WrenVM* vm, int mapSlot, int keySlot,
                         int removedValueSlot);
+
+// Returns the top level variable count in resolved [module].
+WREN_API int wrenGetVariableCount(WrenVM* vm, const char* module);
+
+// Retrieves the top level variable at element [index] in resolved [module] and stores
+// it in [slot].
+WREN_API void wrenGetVariableAt(WrenVM* vm, const char* module, int index,
+                     int slot);
 
 // Looks up the top level variable with [name] in resolved [module] and stores
 // it in [slot].

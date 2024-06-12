@@ -4,6 +4,7 @@
 #include "foreign_class.h"
 
 static int finalized = 0;
+static int uid = 0;
 
 static void apiFinalized(WrenVM* vm)
 {
@@ -28,6 +29,16 @@ static void counterValue(WrenVM* vm)
 {
   double value = *(double*)wrenGetSlotForeign(vm, 0);
   wrenSetSlotDouble(vm, 0, value);
+}
+
+static void rogueAllocate(WrenVM* vm)
+{
+  *(WrenVM**)wrenSetSlotNewForeign(vm, 0, 0, sizeof(WrenVM**)) = vm;
+}
+
+static void rogueFinalize(void* data)
+{
+  wrenCollectGarbage(*(WrenVM**)data);
 }
 
 static void pointAllocate(WrenVM* vm)
@@ -67,6 +78,11 @@ static void pointToString(WrenVM* vm)
   wrenSetSlotString(vm, 0, result);
 }
 
+static void resourceCreateUid(WrenVM* vm)
+{
+  wrenSetSlotDouble(vm, 0, uid++);
+}
+
 static void resourceAllocate(WrenVM* vm)
 {
   int* value = (int*)wrenSetSlotNewForeign(vm, 0, 0, sizeof(int));
@@ -96,6 +112,7 @@ WrenForeignMethodFn foreignClassBindMethod(const char* signature)
   if (strcmp(signature, "Counter.value") == 0) return counterValue;
   if (strcmp(signature, "Point.translate(_,_,_)") == 0) return pointTranslate;
   if (strcmp(signature, "Point.toString") == 0) return pointToString;
+  if (strcmp(signature, "static Resource.createUid") == 0) return resourceCreateUid;
 
   return NULL;
 }
@@ -109,6 +126,13 @@ void foreignClassBindClass(
     return;
   }
 
+  if (strcmp(className, "Rogue") == 0)
+  {
+    methods->allocate = rogueAllocate;
+    methods->finalize = rogueFinalize;
+    return;
+  }
+
   if (strcmp(className, "Point") == 0)
   {
     methods->allocate = pointAllocate;
@@ -116,6 +140,13 @@ void foreignClassBindClass(
   }
 
   if (strcmp(className, "Resource") == 0)
+  {
+    methods->allocate = resourceAllocate;
+    methods->finalize = resourceFinalize;
+    return;
+  }
+
+  if (strcmp(className, "TextureResource") == 0)
   {
     methods->allocate = resourceAllocate;
     methods->finalize = resourceFinalize;
