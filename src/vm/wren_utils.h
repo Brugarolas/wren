@@ -24,6 +24,8 @@ typedef struct sObjString ObjString;
     void wren##name##BufferClear(WrenVM* vm, name##Buffer* buffer);            \
     void wren##name##BufferFill(WrenVM* vm, name##Buffer* buffer, type data,   \
                                 int count);                                    \
+    void wren##name##BufferReserve(WrenVM* vm, name##Buffer* buffer,           \
+                                   int newCapacity);                           \
     void wren##name##BufferWrite(WrenVM* vm, name##Buffer* buffer, type data)
 
 // This should be used once for each type instantiation, somewhere in a .c file.
@@ -44,17 +46,23 @@ typedef struct sObjString ObjString;
     void wren##name##BufferFill(WrenVM* vm, name##Buffer* buffer, type data,   \
                                 int count)                                     \
     {                                                                          \
-      if (buffer->capacity < buffer->count + count)                            \
-      {                                                                        \
-        int capacity = wrenPowerOf2Ceil(buffer->count + count);                \
-        buffer->data = (type*)wrenReallocate(vm, buffer->data,                 \
-            buffer->capacity * sizeof(type), capacity * sizeof(type));         \
-        buffer->capacity = capacity;                                           \
-      }                                                                        \
+      wren##name##BufferReserve(vm, buffer, buffer->count + count);            \
                                                                                \
       for (int i = 0; i < count; i++)                                          \
       {                                                                        \
         buffer->data[buffer->count++] = data;                                  \
+      }                                                                        \
+    }                                                                          \
+                                                                               \
+    void wren##name##BufferReserve(WrenVM* vm, name##Buffer* buffer,           \
+                                   int newCapacity)                            \
+    {                                                                          \
+      if (buffer->capacity < newCapacity)                                      \
+      {                                                                        \
+        newCapacity = wrenPowerOf2Ceil(newCapacity);                           \
+        buffer->data = (type*)wrenReallocate(vm, buffer->data,                 \
+            buffer->capacity * sizeof(type), newCapacity * sizeof(type));      \
+        buffer->capacity = newCapacity;                                        \
       }                                                                        \
     }                                                                          \
                                                                                \
@@ -68,27 +76,31 @@ DECLARE_BUFFER(Int, int);
 DECLARE_BUFFER(String, ObjString*);
 
 // TODO: Change this to use a map.
-typedef StringBuffer SymbolTable;
+typedef struct {
+  StringBuffer array;
+  struct sObjMap *symbol_to_index_map;
+} SymbolTable;
 
 // Initializes the symbol table.
-void wrenSymbolTableInit(SymbolTable* symbols);
+void wrenSymbolTableInit(WrenVM* vm, SymbolTable* symbols);
 
 // Frees all dynamically allocated memory used by the symbol table, but not the
 // SymbolTable itself.
-void wrenSymbolTableClear(WrenVM* vm, SymbolTable* symbols);
+void wrenSymbolTableFini(WrenVM* vm, SymbolTable* symbols);
 
 // Adds name to the symbol table. Returns the index of it in the table.
-int wrenSymbolTableAdd(WrenVM* vm, SymbolTable* symbols,
-                       const char* name, size_t length);
+int wrenSymbolTableAdd(WrenVM* vm, SymbolTable* symbols, const char* name, size_t length);
 
 // Adds name to the symbol table. Returns the index of it in the table. Will
 // use an existing symbol if already present.
-int wrenSymbolTableEnsure(WrenVM* vm, SymbolTable* symbols,
-                          const char* name, size_t length);
+int wrenSymbolTableEnsure(WrenVM* vm, SymbolTable* symbols, const char* name, size_t length);
 
 // Looks up name in the symbol table. Returns its index if found or -1 if not.
-int wrenSymbolTableFind(const SymbolTable* symbols,
-                        const char* name, size_t length);
+int wrenSymbolTableFind(const SymbolTable* symbols, const char* name, size_t length);
+
+int wrenSymbolTableCount(const SymbolTable* symbols);
+
+ObjString* wrenSymbolTableGet(const SymbolTable* symbols, int symbol);
 
 void wrenBlackenSymbolTable(WrenVM* vm, SymbolTable* symbolTable);
 
@@ -137,4 +149,7 @@ typedef struct
 
 // Parses a number from [str] with base [base]. Stores results into [res].
 void wrenParseNum(const char* str, int base, wrenParseNumResults *res);
+
+uint32_t wrenHashMemory(const void *ptr, size_t size);
+
 #endif

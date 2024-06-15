@@ -73,6 +73,8 @@ BENCHMARK("binary_trees_gc", """stretch tree of depth 13 check: -1
 32 trees of depth 12 check: -32
 long lived tree of depth 12 check: -1""")
 
+BENCHMARK("compiler_many_var", "true")
+
 BENCHMARK("delta_blue", "14065400")
 
 BENCHMARK("fib", r"""317811
@@ -93,6 +95,10 @@ BENCHMARK("map_numeric", r"""2000001000000""")
 BENCHMARK("map_string", r"""12799920000""")
 
 BENCHMARK("string_equals", r"""3000000""")
+
+BENCHMARK("string_interpolation", "")
+
+BENCHMARK("string_interpolation_gc", "")
 
 LANGUAGES = [
   ("wren",           [os.path.join(WREN_BIN, 'wren_test')], ".wren"),

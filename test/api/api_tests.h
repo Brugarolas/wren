@@ -14,6 +14,7 @@
 #include "error.h"
 #include "get_variable.h"
 #include "foreign_class.h"
+#include "foreign_method_user_data.h"
 #include "handle.h"
 #include "lists.h"
 #include "maps.h"
@@ -23,10 +24,11 @@
 #include "resolution.h"
 #include "slots.h"
 #include "user_data.h"
+#include "multiple_return_values_foreign.h"
 
 int APITest_Run(WrenVM* vm, const char* inTestName);
 
-WrenForeignMethodFn APITest_bindForeignMethod(
+WrenBindForeignMethodResult APITest_bindForeignMethod(
     WrenVM* vm, const char* module, const char* className,
     bool isStatic, const char* signature);
 

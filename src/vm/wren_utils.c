@@ -6,20 +6,23 @@
 #include <stdio.h>
 
 #include "wren_utils.h"
+#include "wren_value.h"
 #include "wren_vm.h"
 
 DEFINE_BUFFER(Byte, uint8_t);
 DEFINE_BUFFER(Int, int);
 DEFINE_BUFFER(String, ObjString*);
 
-void wrenSymbolTableInit(SymbolTable* symbols)
+void wrenSymbolTableInit(WrenVM* vm, SymbolTable* symbols)
 {
-  wrenStringBufferInit(symbols);
+  wrenStringBufferInit(&symbols->array);
+  symbols->symbol_to_index_map = wrenNewMap(vm);
 }
 
-void wrenSymbolTableClear(WrenVM* vm, SymbolTable* symbols)
+void wrenSymbolTableFini(WrenVM* vm, SymbolTable* symbols)
 {
-  wrenStringBufferClear(vm, symbols);
+  wrenStringBufferClear(vm, &symbols->array);
+  symbols->symbol_to_index_map = NULL;
 }
 
 int wrenSymbolTableAdd(WrenVM* vm, SymbolTable* symbols,
@@ -28,10 +31,14 @@ int wrenSymbolTableAdd(WrenVM* vm, SymbolTable* symbols,
   ObjString* symbol = AS_STRING(wrenNewStringLength(vm, name, length));
   
   wrenPushRoot(vm, &symbol->obj);
-  wrenStringBufferWrite(vm, symbols, symbol);
+  wrenStringBufferWrite(vm, &symbols->array, symbol);
   wrenPopRoot(vm);
-  
-  return symbols->count - 1;
+
+  int index = wrenSymbolTableCount(symbols) - 1;
+
+  wrenMapSet(vm, symbols->symbol_to_index_map, OBJ_VAL(symbol), NUM_VAL(index));
+
+  return index;
 }
 
 int wrenSymbolTableEnsure(WrenVM* vm, SymbolTable* symbols,
@@ -49,24 +56,34 @@ int wrenSymbolTableFind(const SymbolTable* symbols,
                         const char* name, size_t length)
 {
   // See if the symbol is already defined.
-  // TODO: O(n). Do something better.
-  for (int i = 0; i < symbols->count; i++)
-  {
-    if (wrenStringEqualsCString(symbols->data[i], name, length)) return i;
-  }
+  Value value = wrenMapGetStrLength(symbols->symbol_to_index_map, name, length);
 
-  return -1;
+  return IS_NUM(value) ? AS_NUM(value) : -1;
+}
+
+int wrenSymbolTableCount(const SymbolTable* symbols)
+{
+  return symbols->array.count;
+}
+
+ObjString* wrenSymbolTableGet(const SymbolTable* symbols, int symbol)
+{
+  if (symbol < 0 || symbol >= wrenSymbolTableCount(symbols)) return NULL;
+
+  return symbols->array.data[symbol];
 }
 
 void wrenBlackenSymbolTable(WrenVM* vm, SymbolTable* symbolTable)
 {
-  for (int i = 0; i < symbolTable->count; i++)
+  for (int i = 0; i < wrenSymbolTableCount(symbolTable); i++)
   {
-    wrenGrayObj(vm, &symbolTable->data[i]->obj);
+    wrenGrayObj(vm, &symbolTable->array.data[i]->obj);
   }
   
+  wrenGrayObj(vm, &symbolTable->symbol_to_index_map->obj);
+  
   // Keep track of how much memory is still in use.
-  vm->bytesAllocated += symbolTable->capacity * sizeof(*symbolTable->data);
+  vm->bytesAllocated += symbolTable->array.capacity * sizeof(*symbolTable->array.data);
 }
 
 int wrenUtf8EncodeNumBytes(int value)
@@ -222,8 +239,7 @@ int static const maxMantissaDigits[] = {
     /*30*/ 11, /*31*/ 11, /*32*/ 11, /*33*/ 11, /*34*/ 11, /*35*/ 11, /*36*/ 11,
 };
 
-void static wrenParseNumError(int count, const char* err,
-                                 wrenParseNumResults* results)
+void static wrenParseNumError(int count, const char* err, wrenParseNumResults* results)
 {
   results->consumed = count;
   results->errorMessage = err;
@@ -368,8 +384,7 @@ void wrenParseNum(const char* str, int base, wrenParseNumResults* results)
     }
 
     // We must have parsed digits from here or else this number is invalid
-    if (!hasDigits) return wrenParseNumError(i, "Number has no digits.",
-                                             results);
+    if (!hasDigits) return wrenParseNumError(i, "Number has no digits.", results);
 
     // Parse the exponential part of the number.
     if (c == 'e' || c == 'E')
@@ -398,8 +413,7 @@ void wrenParseNum(const char* str, int base, wrenParseNumResults* results)
           }
           else
           {
-            if (expNeg) return wrenParseNumError(i, "Exponent is too small.",
-                                                 results);
+            if (expNeg) return wrenParseNumError(i, "Exponent is too small.", results);
             return wrenParseNumError(i, "Exponent is too large.", results);
           }
           expHasDigits = true;
@@ -408,8 +422,7 @@ void wrenParseNum(const char* str, int base, wrenParseNumResults* results)
         c = str[++i];
       }
       if (!expHasDigits)
-          return wrenParseNumError(i, "Unterminated scientific literal.",
-                                   results);
+          return wrenParseNumError(i, "Unterminated scientific literal.", results);
       // Before changing "e", ensure that it will not overflow.
       if (expNeg)
       {
@@ -423,8 +436,7 @@ void wrenParseNum(const char* str, int base, wrenParseNumResults* results)
       }
     }
   } else {
-    if (!hasDigits) return wrenParseNumError(i, "Number has no digits.",
-                                             results);
+    if (!hasDigits) return wrenParseNumError(i, "Number has no digits.", results);
   }
 
   // Floating point math is often inaccurate. To get around this issue, we
@@ -436,9 +448,27 @@ void wrenParseNum(const char* str, int base, wrenParseNumResults* results)
   // Check whether the number became infinity or 0 from being too big or too
   // small.
   if (isinf(f)) return wrenParseNumError(i, "Number is too large.", results);
-  else if (f == 0 && num != 0)
-           return wrenParseNumError(i, "Number is too small.", results);
+  else if (f == 0 && num != 0) return wrenParseNumError(i, "Number is too small.", results);
+
   results->errorMessage = NULL;
   results->consumed = i;
   results->value = neg ? f * -1 : f;
+}
+
+// Calculates and stores the hash code for memory at [ptr] of size [size].
+uint32_t wrenHashMemory(const void *ptr, size_t size)
+{
+  // FNV-1a hash. See: http://www.isthe.com/chongo/tech/comp/fnv/
+  uint32_t hash = 2166136261u;
+
+  // This is O(n) on the length of the string, but we only call this when a new
+  // string is created. Since the creation is also O(n) (to copy/initialize all
+  // the bytes), we allow this here.
+  for (uint32_t i = 0; i < size; i++)
+  {
+    hash ^= ((const uint8_t *)ptr)[i];
+    hash *= 16777619;
+  }
+
+  return hash;
 }
