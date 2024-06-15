@@ -89,17 +89,14 @@ void wrenSymbolTableInit(WrenVM* vm, SymbolTable* symbols);
 void wrenSymbolTableFini(WrenVM* vm, SymbolTable* symbols);
 
 // Adds name to the symbol table. Returns the index of it in the table.
-int wrenSymbolTableAdd(WrenVM* vm, SymbolTable* symbols,
-                       const char* name, size_t length);
+int wrenSymbolTableAdd(WrenVM* vm, SymbolTable* symbols, const char* name, size_t length);
 
 // Adds name to the symbol table. Returns the index of it in the table. Will
 // use an existing symbol if already present.
-int wrenSymbolTableEnsure(WrenVM* vm, SymbolTable* symbols,
-                          const char* name, size_t length);
+int wrenSymbolTableEnsure(WrenVM* vm, SymbolTable* symbols, const char* name, size_t length);
 
 // Looks up name in the symbol table. Returns its index if found or -1 if not.
-int wrenSymbolTableFind(const SymbolTable* symbols,
-                        const char* name, size_t length);
+int wrenSymbolTableFind(const SymbolTable* symbols, const char* name, size_t length);
 
 int wrenSymbolTableCount(const SymbolTable* symbols);
 
@@ -137,6 +134,21 @@ int wrenPowerOf2Ceil(int n);
 // negative indices which map backwards from the end. Returns the valid positive
 // index value. If invalid, returns `UINT32_MAX`.
 uint32_t wrenValidateIndex(uint32_t count, int64_t value);
+
+typedef struct
+{
+  // The amount of characters consumed.
+  int consumed;
+
+  // If the parse was successful, [value] will contain the the parsed double.
+  // [errorMessage] will be NULL if the parse was successful or will explain
+  // what went wrong.
+  double value;
+  const char* errorMessage;
+} wrenParseNumResults;
+
+// Parses a number from [str] with base [base]. Stores results into [res].
+void wrenParseNum(const char* str, int base, wrenParseNumResults *res);
 
 uint32_t wrenHashMemory(const void *ptr, size_t size);
 
