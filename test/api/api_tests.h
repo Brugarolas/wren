@@ -19,6 +19,7 @@
 #include "lists.h"
 #include "maps.h"
 #include "new_vm.h"
+#include "raw_value.h"
 #include "reset_stack_after_call_abort.h"
 #include "reset_stack_after_foreign_construct.h"
 #include "resolution.h"

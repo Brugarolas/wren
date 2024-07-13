@@ -54,6 +54,9 @@ WrenBindForeignMethodResult APITest_bindForeignMethod(
   method = newVMBindMethod(fullName);
   RETURN_IF_NONNULL(method);
 
+  method = rawValueBindMethod(fullName);
+  if (method != NULL) return method;
+
   method = resolutionBindMethod(fullName);
   RETURN_IF_NONNULL(method);
 
@@ -86,6 +89,9 @@ WrenForeignClassMethods APITest_bindForeignClass(
   if (strncmp(module, "./test/api", 7) != 0) return methods;
 
   foreignClassBindClass(className, &methods);
+  if (methods.allocate != NULL) return methods;
+
+  rawValueBindClass(className, &methods);
   if (methods.allocate != NULL) return methods;
 
   resetStackAfterForeignConstructBindClass(className, &methods);

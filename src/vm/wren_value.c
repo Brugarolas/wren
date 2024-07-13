@@ -1066,6 +1066,48 @@ ObjUpvalue* wrenNewUpvalue(WrenVM* vm, Value* value)
   return upvalue;
 }
 
+static Obj* newIValue(WrenVM* vm, Value value)
+{
+#if WREN_NAN_TAGGING
+  ASSERT(false, "unreachable when NaN tagging");
+#else
+  ObjIValue* ivalue = ALLOCATE(vm, ObjIValue);
+  initObj(&vm, &ivalue->obj, OBJ_IVALUE, NULL);
+  ivalue->value = value;
+  return &ivalue->obj;
+#endif
+}
+
+WrenRawValue wrenNullRawValue(void)
+{
+  Value null = NULL_VAL;
+  
+  WrenRawValue raw;
+  SET_RAW_VALUE(&raw, null);
+  return raw;
+}
+
+WrenRawValue wrenMakeRawValue(WrenVM* vm, Value value)
+{
+  WrenRawValue raw;
+
+  if (RAW_VALUE_MUST_BOX(value)) {
+    value = OBJ_VAL(newIValue(vm, value));
+  }
+
+  SET_RAW_VALUE(&raw, value);
+  return raw;
+}
+
+Value wrenUnpackRawValue(WrenRawValue raw)
+{
+  Value value = UNPACK_RAW_VALUE(raw);
+  if (IS_IVALUE(value)) {
+    value = AS_IVALUE(value)->value;
+  }
+  return value;
+}
+
 void wrenGrayObj(WrenVM* vm, Obj* obj)
 {
   if (obj == NULL) return;
@@ -1121,6 +1163,16 @@ static void blackenMemorySegment(WrenVM* vm, ObjMemorySegment* ms)
 
   // Keep track of how much memory is still in use.
   vm->bytesAllocated += wrenMemorySegmentAllocatedSize(ms);
+}
+
+void wrenTraceRawValue(WrenTracer *tracer, WrenRawValue rawValue)
+{
+  // The tracer pointer is actually just the VM. We use a different type
+  // to make misue require a little effort
+  WrenVM* vm = (WrenVM*) tracer;
+
+  Value value = wrenUnpackRawValue(rawValue);
+  wrenGrayValue(vm, value);
 }
 
 static void blackenClass(WrenVM* vm, ObjClass* classObj)
@@ -1209,6 +1261,21 @@ static void blackenFn(WrenVM* vm, ObjFn* fn)
   // TODO: What about the function name?
 }
 
+static void blackenInstance(WrenVM* vm, ObjInstance* instance)
+{
+  wrenGrayObj(vm, (Obj*)instance->obj.classObj);
+
+  // Mark the fields.
+  for (int i = 0; i < instance->obj.classObj->numFields; i++)
+  {
+    wrenGrayValue(vm, instance->fields[i]);
+  }
+
+  // Keep track of how much memory is still in use.
+  vm->bytesAllocated += sizeof(ObjInstance);
+  vm->bytesAllocated += sizeof(Value) * instance->obj.classObj->numFields;
+}
+
 static void blackenList(WrenVM* vm, ObjList* list)
 {
   // Mark the elements.
@@ -1270,6 +1337,14 @@ static void blackenUpvalue(WrenVM* vm, ObjUpvalue* upvalue)
   vm->bytesAllocated += sizeof(ObjUpvalue);
 }
 
+static void blackenIValue(WrenVM* vm, ObjIValue *ivalue)
+{
+  wrenGrayValue(vm, ivalue->value);
+
+  // Keep track of how much memory is still in use.
+  vm->bytesAllocated += sizeof(ObjIValue); 
+}
+
 static void blackenObject(WrenVM* vm, Obj* obj)
 {
 #if WREN_DEBUG_TRACE_MEMORY
@@ -1281,18 +1356,22 @@ static void blackenObject(WrenVM* vm, Obj* obj)
   // Traverse the object's fields.
   switch (obj->type)
   {
-    case OBJ_CLASS:    blackenClass(   vm, (ObjClass*)   obj); break;
-    case OBJ_CLOSURE:  blackenClosure( vm, (ObjClosure*) obj); break;
-    case OBJ_FIBER:    blackenFiber(   vm, (ObjFiber*)   obj); break;
-    case OBJ_FN:       blackenFn(      vm, (ObjFn*)      obj); break;
-    case OBJ_FOREIGN:
-    case OBJ_INSTANCE: blackenMemorySegment(vm, (ObjMemorySegment*)obj); break;
-    case OBJ_LIST:     blackenList(    vm, (ObjList*)    obj); break;
-    case OBJ_MAP:      blackenMap(     vm, (ObjMap*)     obj); break;
-    case OBJ_MODULE:   blackenModule(  vm, (ObjModule*)  obj); break;
-    case OBJ_RANGE:    blackenRange(   vm, (ObjRange*)   obj); break;
-    case OBJ_STRING:   blackenString(  vm, (ObjString*)  obj); break;
-    case OBJ_UPVALUE:  blackenUpvalue( vm, (ObjUpvalue*) obj); break;
+    case OBJ_CLASS:    blackenClass(    vm, (ObjClass*)   obj); break;
+    case OBJ_CLOSURE:  blackenClosure(  vm, (ObjClosure*) obj); break;
+    case OBJ_FIBER:    blackenFiber(    vm, (ObjFiber*)   obj); break;
+    case OBJ_FN:       blackenFn(       vm, (ObjFn*)      obj); break;
+    case OBJ_FOREIGN:  wrenTraceForeign(vm, (ObjForeign*) obj); break;
+    case OBJ_INSTANCE: blackenInstance( vm, (ObjInstance*)obj); break;
+    case OBJ_LIST:     blackenList(     vm, (ObjList*)    obj); break;
+    case OBJ_MAP:      blackenMap(      vm, (ObjMap*)     obj); break;
+    case OBJ_MODULE:   blackenModule(   vm, (ObjModule*)  obj); break;
+    case OBJ_RANGE:    blackenRange(    vm, (ObjRange*)   obj); break;
+    case OBJ_STRING:   blackenString(   vm, (ObjString*)  obj); break;
+    case OBJ_UPVALUE:  blackenUpvalue(  vm, (ObjUpvalue*) obj); break;
+  #if !WREN_NAN_TAGGING
+    case OBJ_IVALUE:   blackenIValue(   vm, (ObjIValue*)  obj); break;
+      break;
+  #endif
   }
 }
 

@@ -48,7 +48,7 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		7D2D12CE809DE500020A890E /* Frameworks */ = {
+		114A91EE7D2D12CEE8CC16E5809DE500D7BF6956020A890E /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -58,26 +58,26 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		046BC81407DC9A4689493E54 /* optional */ = {
+		134D909B046BC814EACF159207DC9A46D9C2680289493E54 /* optional */ = {
 			isa = PBXGroup;
 			children = (
-				62592227F4E6EC195DBF9067 /* wren_opt_meta.c */,
-				B8CA70B14B583AA3B430DEF1 /* wren_opt_meta.h */,
-				737815DBCADD88CD7CEBA41B /* wren_opt_random.c */,
-				AAEE79A50253EC97B46207E5 /* wren_opt_random.h */,
+				37890E6B62592227B630668F4E6EC19E124B99D5DBF9067 /* wren_opt_meta.c */,
+				A3605D15B8CA70B1773A55134B583AA34CFC0847B430DEF1 /* wren_opt_meta.h */,
+				CA644125737815DB6A4E4BA1CADD88CDE365E21A7CEBA41B /* wren_opt_random.c */,
+				8949E3BDAAEE79A52933EE3A0253EC97A24B84B2B46207E5 /* wren_opt_random.h */,
 			);
 			name = optional;
 			sourceTree = "<group>";
 		};
-		5E8C725002DF100215175890 /* include */ = {
+		7806C7175E8C72505F8A8A5402DF10029C2CF7B715175890 /* include */ = {
 			isa = PBXGroup;
 			children = (
-				ECE6D43F03F96F71F4156A7F /* wren.h */,
+				C3CCDE8DECE6D43FD9E6454803F96F71DE2675BEF4156A7F /* wren.h */,
 			);
 			name = include;
 			sourceTree = "<group>";
 		};
-		7E4BAA0E72C22140C195C04E /* vm */ = {
+		8BE7350ED82C1CD296A3E917423E9EC4D2B6AAC0DB698B12 /* wren_shared */ = {
 			isa = PBXGroup;
 			children = (
 				14FE11AE703F65204399AFEE /* wren_common.h */,
@@ -100,38 +100,51 @@
 				B65A1C18AFC01D8AA35B7A58 /* wren_vm.c */,
 				4BF57B22455B7C9438F6D962 /* wren_vm.h */,
 			);
-			name = vm;
+			name = wren_shared;
 			sourceTree = "<group>";
 		};
-		A6C936B49B3FADE6EA134CF4 /* Products */ = {
+		DE2FD571A6C936B48E134D4D9B3FADE6BA17F9BDEA134CF4 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				89E69C5EA0F937909115329E /* libwren.dylib */,
+				F73C1BAA89E69C5ED558264A0F937901195B2DB9115329E /* libwren.dylib */,
 			);
 			name = Products;
 			sourceTree = "<group>";
 		};
-		D82C1CD2423E9EC4DB698B12 /* wren_shared */ = {
+		F8B04A797E4BAA0EA893C25572C22140D4986EC5C195C04E /* vm */ = {
 			isa = PBXGroup;
 			children = (
-				5E8C725002DF100215175890 /* include */,
-				046BC81407DC9A4689493E54 /* optional */,
-				7E4BAA0E72C22140C195C04E /* vm */,
-				A6C936B49B3FADE6EA134CF4 /* Products */,
+				962ECC2714FE11AEA9A892E8703F65208EDF42354399AFEE /* wren_common.h */,
+				9BCFC5AC5FFB2C83E54AEEFBFC16F3A32B914CFF9C07108 /* wren_compiler.c */,
+				5A1BD6E227B7A1928EB3897721795E048317EF575B785FD2 /* wren_compiler.h */,
+				435137FAA24154A4B14FB501F8CEBF166A9EB693D147D2E4 /* wren_core.c */,
+				4DBFC1DA8BA7E8EEBBBE3EE1E2355360750D4073BAAE672E /* wren_core.h */,
+				978A996E39C268007F1C75A5695436F2C832230F44617640 /* wren_debug.c */,
+				EFCA5F4B44AC34EAD75C3B82743E03DC2071E8EC4F4B432A /* wren_debug.h */,
+				BB6B10F880BCD9B029698DFFD74A4422E2B88F91AFC357F0 /* wren_math.h */,
+				31A71877BB4B776DC20EE0CAC98AF68E9C0A3DBBFB0E5B6 /* wren_opcodes.h */,
+				D44ABAC26F6161248D99667CE08402162CAEC553964AAF64 /* wren_primitive.c */,
+				3084E635FCC7D88EE9D391F06DEA798088E8F0C723B126CE /* wren_primitive.h */,
+				ACDD9FB0A5CED894946F7BE7D560A786DD852951B06DE6D4 /* wren_utils.c */,
+				51D658DB0B8A57EECAF41C4E04A747035C4EF2EBB57B3BE /* wren_utils.h */,
+				3E0EE55AD30296CEB72CA8CDCC1F85E348877F6B7CF37AC /* wren_value.c */,
+				5C20B432B819F65643B29069E7ABC5488CC83DD3C2B90496 /* wren_value.h */,
+				6C0D5F84B65A1C1845539D81AFC01D8AD199DCD6A35B7A58 /* wren_vm.c */,
+				4DF8C9AA4BF57B22273F07A7455B7C94B38546FC38F6D962 /* wren_vm.h */,
 			);
-			name = wren_shared;
+			name = vm;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		CFFD6084D0B05D7644922EC4 /* wren_shared */ = {
+		5511E963CFFD6084D1DC60DDD0B05D766D24244644922EC4 /* wren_shared */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 6B685B2D6ED92D5FF045D16D /* Build configuration list for PBXNativeTarget "wren_shared" */;
+			buildConfigurationList = 114A91ED6B685B2DE8CC16E46ED92D5FD7BF6954F045D16D /* Build configuration list for PBXNativeTarget "wren_shared" */;
 			buildPhases = (
-				ED14936EF08565A071F209AE /* Resources */,
-				56C1ACC55A327EF7DB9F2305 /* Sources */,
-				7D2D12CE809DE500020A890E /* Frameworks */,
+				114A91F1ED14936EE8CC16E8F08565A0D7BF695971F209AE /* Resources */,
+				114A91F256C1ACC5E8CC16E95A327EF7D7BF6959DB9F2305 /* Sources */,
+				114A91EE7D2D12CEE8CC16E5809DE500D7BF6956020A890E /* Frameworks */,
 			);
 			buildRules = (
 			);
@@ -139,7 +152,7 @@
 			);
 			name = wren_shared;
 			productName = wren_shared;
-			productReference = 89E69C5EA0F937909115329E /* libwren.dylib */;
+			productReference = F73C1BAA89E69C5ED558264A0F937901195B2DB9115329E /* libwren.dylib */;
 			productType = "com.apple.product-type.library.dynamic";
 		};
 /* End PBXNativeTarget section */
@@ -150,17 +163,17 @@
 			buildConfigurationList = 1DEB928908733DD80010E9CD /* Build configuration list for PBXProject "wren_shared" */;
 			compatibilityVersion = "Xcode 3.2";
 			hasScannedForEncodings = 1;
-			mainGroup = D82C1CD2423E9EC4DB698B12 /* wren_shared */;
+			mainGroup = 8BE7350ED82C1CD296A3E917423E9EC4D2B6AAC0DB698B12 /* wren_shared */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				CFFD6084D0B05D7644922EC4 /* libwren.dylib */,
+				5511E963CFFD6084D1DC60DDD0B05D766D24244644922EC4 /* libwren.dylib */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		ED14936EF08565A071F209AE /* Resources */ = {
+		114A91F1ED14936EE8CC16E8F08565A0D7BF695971F209AE /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -170,7 +183,7 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		56C1ACC55A327EF7DB9F2305 /* Sources */ = {
+		114A91F256C1ACC5E8CC16E95A327EF7D7BF6959DB9F2305 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -193,64 +206,13 @@
 /* End PBXVariantGroup section */
 
 /* Begin XCBuildConfiguration section */
-		9328E01B361706CDC53CE65B /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CONFIGURATION_BUILD_DIR = "$(SYMROOT)";
-				CONFIGURATION_TEMP_DIR = "$(OBJROOT)";
-				GCC_C_LANGUAGE_STANDARD = c99;
-				GCC_OPTIMIZATION_LEVEL = 3;
-				GCC_PREPROCESSOR_DEFINITIONS = (
-					NDEBUG,
-					"WREN_NAN_TAGGING=0",
-				);
-				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
-				GCC_WARN_ABOUT_RETURN_TYPE = YES;
-				GCC_WARN_UNUSED_VARIABLE = YES;
-				OBJROOT = "obj/64bit-no-nan-tagging/Release/wren_shared";
-				ONLY_ACTIVE_ARCH = NO;
-				SYMROOT = ../../lib;
-				USER_HEADER_SEARCH_PATHS = (
-					../../src/include,
-					../../src/vm,
-					../../src/optional,
-				);
-			};
-			name = Release;
-		};
-		CB419B73ED0D48A529C271B3 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ALWAYS_SEARCH_USER_PATHS = NO;
-				CONFIGURATION_BUILD_DIR = ../../lib;
-				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				EXECUTABLE_PREFIX = lib;
-				GCC_DYNAMIC_NO_PIC = NO;
-				INSTALL_PATH = /usr/local/lib;
-				PRODUCT_NAME = wren_d;
-			};
-			name = Debug;
-		};
-		E8D95F2DAC4520DFEAE8C56D /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ALWAYS_SEARCH_USER_PATHS = NO;
-				CONFIGURATION_BUILD_DIR = ../../lib;
-				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				EXECUTABLE_PREFIX = lib;
-				GCC_DYNAMIC_NO_PIC = NO;
-				INSTALL_PATH = /usr/local/lib;
-				PRODUCT_NAME = wren;
-			};
-			name = Release;
-		};
-		F95419A1FCC4EBD37E318FE1 /* Debug */ = {
+		21D944D6F95419A1F95AC9CDFCC4EBD3E84E1C3E7E318FE1 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CONFIGURATION_BUILD_DIR = "$(SYMROOT)";
 				CONFIGURATION_TEMP_DIR = "$(OBJROOT)";
 				COPY_PHASE_STRIP = NO;
-				GCC_C_LANGUAGE_STANDARD = c99;
+				GCC_C_LANGUAGE_STANDARD = C99;
 				GCC_ENABLE_FIX_AND_CONTINUE = YES;
 				GCC_OPTIMIZATION_LEVEL = 0;
 				GCC_PREPROCESSOR_DEFINITIONS = (
@@ -271,31 +233,82 @@
 			};
 			name = Debug;
 		};
+		2EE32E69CB419B738B09186ED0D48A5747BEC2C29C271B3 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CONFIGURATION_BUILD_DIR = ../../lib;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				EXECUTABLE_PREFIX = lib;
+				GCC_DYNAMIC_NO_PIC = NO;
+				INSTALL_PATH = /usr/local/lib;
+				PRODUCT_NAME = wren_d;
+			};
+			name = Debug;
+		};
+		971D9FFAE8D95F2D19D03EE7AC4520DFA5DCD7CEEAE8C56D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CONFIGURATION_BUILD_DIR = ../../lib;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				EXECUTABLE_PREFIX = lib;
+				GCC_DYNAMIC_NO_PIC = NO;
+				INSTALL_PATH = /usr/local/lib;
+				PRODUCT_NAME = wren;
+			};
+			name = Release;
+		};
+		FD8A10209328E01BBB80AEE6361706CD34925F7CC53CE65B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CONFIGURATION_BUILD_DIR = "$(SYMROOT)";
+				CONFIGURATION_TEMP_DIR = "$(OBJROOT)";
+				GCC_C_LANGUAGE_STANDARD = C99;
+				GCC_OPTIMIZATION_LEVEL = 3;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					NDEBUG,
+					"WREN_NAN_TAGGING=0",
+				);
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				OBJROOT = "obj/64bit-no-nan-tagging/Release/wren_shared";
+				ONLY_ACTIVE_ARCH = NO;
+				SYMROOT = ../../lib;
+				USER_HEADER_SEARCH_PATHS = (
+					../../src/include,
+					../../src/vm,
+					../../src/optional,
+				);
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		1DEB928908733DD80010E9CD /* Build configuration list for PBXProject "wren_shared" */ = {
+		114A91ED6B685B2DE8CC16E46ED92D5FD7BF6954F045D16D /* Build configuration list for PBXNativeTarget "libwren.dylib" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				9328E01B361706CDC53CE65B /* Release */,
-				9328E01B361706CDC53CE65B /* Release */,
-				9328E01B361706CDC53CE65B /* Release */,
-				F95419A1FCC4EBD37E318FE1 /* Debug */,
-				F95419A1FCC4EBD37E318FE1 /* Debug */,
-				F95419A1FCC4EBD37E318FE1 /* Debug */,
+				971D9FFAE8D95F2D19D03EE7AC4520DFA5DCD7CEEAE8C56D /* Release */,
+				971D9FFAE8D95F2D19D03EE7AC4520DFA5DCD7CEEAE8C56D /* Release */,
+				971D9FFAE8D95F2D19D03EE7AC4520DFA5DCD7CEEAE8C56D /* Release */,
+				2EE32E69CB419B738B09186ED0D48A5747BEC2C29C271B3 /* Debug */,
+				2EE32E69CB419B738B09186ED0D48A5747BEC2C29C271B3 /* Debug */,
+				2EE32E69CB419B738B09186ED0D48A5747BEC2C29C271B3 /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		6B685B2D6ED92D5FF045D16D /* Build configuration list for PBXNativeTarget "libwren.dylib" */ = {
+		1DEB928908733DD80010E9CD /* Build configuration list for PBXProject "wren_shared" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				E8D95F2DAC4520DFEAE8C56D /* Release */,
-				E8D95F2DAC4520DFEAE8C56D /* Release */,
-				E8D95F2DAC4520DFEAE8C56D /* Release */,
-				CB419B73ED0D48A529C271B3 /* Debug */,
-				CB419B73ED0D48A529C271B3 /* Debug */,
-				CB419B73ED0D48A529C271B3 /* Debug */,
+				FD8A10209328E01BBB80AEE6361706CD34925F7CC53CE65B /* Release */,
+				FD8A10209328E01BBB80AEE6361706CD34925F7CC53CE65B /* Release */,
+				FD8A10209328E01BBB80AEE6361706CD34925F7CC53CE65B /* Release */,
+				21D944D6F95419A1F95AC9CDFCC4EBD3E84E1C3E7E318FE1 /* Debug */,
+				21D944D6F95419A1F95AC9CDFCC4EBD3E84E1C3E7E318FE1 /* Debug */,
+				21D944D6F95419A1F95AC9CDFCC4EBD3E84E1C3E7E318FE1 /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
