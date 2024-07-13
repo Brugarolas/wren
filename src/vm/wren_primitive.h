@@ -13,7 +13,7 @@
       Method method;                                                           \
       method.type = METHOD_PRIMITIVE;                                          \
       method.as.primitive = prim_##function;                                   \
-      wrenBindMethod(vm, cls, symbol, method);                                 \
+      wrenBindMethod(vm, cls, symbol, method, WREN_USER_DATA_NONE);            \
     } while (false)
 
 // Binds a primitive method named [name] (in Wren) implemented using C function
@@ -26,7 +26,7 @@
       Method method;                                                           \
       method.type = METHOD_FUNCTION_CALL;                                      \
       method.as.primitive = prim_##function;                                   \
-      wrenBindMethod(vm, cls, symbol, method);                                 \
+      wrenBindMethod(vm, cls, symbol, method, WREN_USER_DATA_NONE);            \
     } while (false)
 
 // Defines a primitive method whose C function name is [name]. This abstracts
@@ -49,6 +49,13 @@
 #define RETURN_NUM(value)   RETURN_VAL(NUM_VAL(value))
 #define RETURN_TRUE         RETURN_VAL(TRUE_VAL)
 
+#define SET_ERROR_AND_RETURN(msg)                                              \
+    do                                                                         \
+    {                                                                          \
+      vm->fiber->error = wrenNewStringLength(vm, msg, sizeof(msg) - 1);        \
+      return;                                                                  \
+    } while (false)
+
 #define RETURN_ERROR(msg)                                                      \
     do                                                                         \
     {                                                                          \
@@ -62,6 +69,10 @@
       vm->fiber->error = wrenStringFormat(vm, __VA_ARGS__);                    \
       return false;                                                            \
     } while (false)
+
+// Validates that the given [arg] is a boolean. Returns true if it is. If not,
+// reports an error and returns false.
+bool validateBool(WrenVM* vm, Value arg, const char* argName);
 
 // Validates that the given [arg] is a function. Returns true if it is. If not,
 // reports an error and returns false.

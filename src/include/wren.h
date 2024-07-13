@@ -80,7 +80,7 @@ typedef union WrenRawValue {
 typedef void* (*WrenReallocateFn)(void* memory, size_t newSize, void* userData);
 
 // A function callable from Wren code, but implemented in C.
-typedef void (*WrenForeignMethodFn)(WrenVM* vm);
+typedef void (*WrenForeignMethodFn)(WrenVM* vm, void *userData);
 
 // A tracer function for marking objects reachable from this object instance.
 // Tracer functions do not have access to the VM and must not call back into it
@@ -123,9 +123,19 @@ typedef struct WrenLoadModuleResult
 // Loads and returns the source code for the module [name].
 typedef WrenLoadModuleResult (*WrenLoadModuleFn)(WrenVM* vm, const char* name);
 
-// Returns a pointer to a foreign method on [className] in [module] with
-// [signature].
-typedef WrenForeignMethodFn (*WrenBindForeignMethodFn)(WrenVM* vm,
+// The result of a bindForeignMethodFn call.
+// [executeFn] is the function to call.
+// [userData] is passed to [executeFn].  The caller is responsible for making
+// sure [userData] is still valid whenever Wren calls [executeFn].
+typedef struct WrenBindForeignMethodResult {
+  WrenForeignMethodFn executeFn;
+  void* userData;
+} WrenBindForeignMethodResult;
+
+// Returns a foreign method and userdata on [className] in [module]
+// with [isStatic]/[signature].  If the method is not found, the returned
+// WrenBindForeignMethodResult.executeFn == NULL.
+typedef WrenBindForeignMethodResult (*WrenBindForeignMethodFn)(WrenVM* vm,
     const char* module, const char* className, bool isStatic,
     const char* signature);
 
@@ -560,6 +570,10 @@ WREN_API int wrenGetMapCount(WrenVM* vm, int slot);
 // Returns true if the key in [keySlot] is found in the map placed in [mapSlot].
 WREN_API bool wrenGetMapContainsKey(WrenVM* vm, int mapSlot, int keySlot);
 
+// Retrieves the value and key at element [index] from the map in [mapSlot] and
+// stores it in [keySlot] and [valueSlot].
+WREN_API void wrenGetMapKeyValueAt(WrenVM* vm, int mapSlot, int index, int keySlot, int valueSlot);
+
 // Retrieves a value with the key in [keySlot] from the map in [mapSlot] and
 // stores it in [valueSlot].
 WREN_API void wrenGetMapValue(WrenVM* vm, int mapSlot, int keySlot, int valueSlot);
@@ -573,6 +587,14 @@ WREN_API void wrenSetMapValue(WrenVM* vm, int mapSlot, int keySlot, int valueSlo
 // set to null, the same behaviour as the Wren Map API.
 WREN_API void wrenRemoveMapValue(WrenVM* vm, int mapSlot, int keySlot,
                         int removedValueSlot);
+
+// Returns the top level variable count in resolved [module].
+WREN_API int wrenGetVariableCount(WrenVM* vm, const char* module);
+
+// Retrieves the top level variable at element [index] in resolved [module] and stores
+// it in [slot].
+WREN_API void wrenGetVariableAt(WrenVM* vm, const char* module, int index,
+                     int slot);
 
 // Looks up the top level variable with [name] in resolved [module] and stores
 // it in [slot].
@@ -602,5 +624,9 @@ WREN_API WrenRawValue wrenNullRawValue(void);
 
 // Traces the passed RawValue
 WREN_API void wrenTraceRawValue(WrenTracer *tracer, WrenRawValue value);
+
+// Sets how many values are returned from a foreign call.
+WREN_API void wrenSetForeignReturnValues(WrenVM* vm, int num);
+
 
 #endif
