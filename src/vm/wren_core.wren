@@ -401,6 +401,11 @@ class String is Sequence {
     }
     return result
   }
+ 
+  <  (other) { compareTo(other) <  0 }
+  <= (other) { compareTo(other) <= 0 }
+  >  (other) { compareTo(other) >  0 }
+  >= (other) { compareTo(other) >= 0 }
 }
 
 class StringByteSequence is Sequence {
