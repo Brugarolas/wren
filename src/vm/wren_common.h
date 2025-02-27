@@ -116,6 +116,9 @@
 // field index*.
 #define MAX_FIELDS 255
 
+// The maximum number of methods the vm can handle.
+#define MAX_METHODS 65535
+
 // Use the VM's allocator to allocate an object of [type].
 #define ALLOCATE(vm, type)                                                     \
     ((type*)wrenReallocate(vm, NULL, 0, sizeof(type)))
