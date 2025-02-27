@@ -8,11 +8,14 @@ ifndef verbose
   SILENT = @
 endif
 
-.PHONY: clean prebuild
+.PHONY: clean prebuild prelink
 
-SHELLTYPE := posix
-ifeq (.exe,$(findstring .exe,$(ComSpec)))
-	SHELLTYPE := msdos
+SHELLTYPE := msdos
+ifeq (,$(ComSpec)$(COMSPEC))
+  SHELLTYPE := posix
+endif
+ifeq (/bin,$(findstring /bin,$(SHELL)))
+  SHELLTYPE := posix
 endif
 
 # Configurations
@@ -49,8 +52,9 @@ DEFINES += -DNDEBUG
 ALL_CFLAGS += $(CFLAGS) $(ALL_CPPFLAGS) -m64 -O2 -std=c99
 ALL_CXXFLAGS += $(CXXFLAGS) $(ALL_CPPFLAGS) -m64 -O2
 ALL_LDFLAGS += $(LDFLAGS) -m64
+endif
 
-else ifeq ($(config),release_32bit)
+ifeq ($(config),release_32bit)
 TARGETDIR = ../../lib
 TARGET = $(TARGETDIR)/libwren.a
 OBJDIR = obj/32bit/Release/wren
@@ -58,8 +62,9 @@ DEFINES += -DNDEBUG
 ALL_CFLAGS += $(CFLAGS) $(ALL_CPPFLAGS) -m32 -O2 -std=c99
 ALL_CXXFLAGS += $(CXXFLAGS) $(ALL_CPPFLAGS) -m32 -O2
 ALL_LDFLAGS += $(LDFLAGS) -m32
+endif
 
-else ifeq ($(config),release_64bit-no-nan-tagging)
+ifeq ($(config),release_64bit-no-nan-tagging)
 TARGETDIR = ../../lib
 TARGET = $(TARGETDIR)/libwren.a
 OBJDIR = obj/64bit-no-nan-tagging/Release/wren
@@ -67,8 +72,9 @@ DEFINES += -DNDEBUG -DWREN_NAN_TAGGING=0
 ALL_CFLAGS += $(CFLAGS) $(ALL_CPPFLAGS) -O2 -std=c99
 ALL_CXXFLAGS += $(CXXFLAGS) $(ALL_CPPFLAGS) -O2
 ALL_LDFLAGS += $(LDFLAGS)
+endif
 
-else ifeq ($(config),debug_64bit)
+ifeq ($(config),debug_64bit)
 TARGETDIR = ../../lib
 TARGET = $(TARGETDIR)/libwren_d.a
 OBJDIR = obj/64bit/Debug/wren
@@ -76,8 +82,9 @@ DEFINES += -DDEBUG
 ALL_CFLAGS += $(CFLAGS) $(ALL_CPPFLAGS) -m64 -g -std=c99
 ALL_CXXFLAGS += $(CXXFLAGS) $(ALL_CPPFLAGS) -m64 -g
 ALL_LDFLAGS += $(LDFLAGS) -m64
+endif
 
-else ifeq ($(config),debug_32bit)
+ifeq ($(config),debug_32bit)
 TARGETDIR = ../../lib
 TARGET = $(TARGETDIR)/libwren_d.a
 OBJDIR = obj/32bit/Debug/wren
@@ -85,8 +92,9 @@ DEFINES += -DDEBUG
 ALL_CFLAGS += $(CFLAGS) $(ALL_CPPFLAGS) -m32 -g -std=c99
 ALL_CXXFLAGS += $(CXXFLAGS) $(ALL_CPPFLAGS) -m32 -g
 ALL_LDFLAGS += $(LDFLAGS) -m32
+endif
 
-else ifeq ($(config),debug_64bit-no-nan-tagging)
+ifeq ($(config),debug_64bit-no-nan-tagging)
 TARGETDIR = ../../lib
 TARGET = $(TARGETDIR)/libwren_d.a
 OBJDIR = obj/64bit-no-nan-tagging/Debug/wren
@@ -94,9 +102,6 @@ DEFINES += -DDEBUG -DWREN_NAN_TAGGING=0
 ALL_CFLAGS += $(CFLAGS) $(ALL_CPPFLAGS) -g -std=c99
 ALL_CXXFLAGS += $(CXXFLAGS) $(ALL_CPPFLAGS) -g
 ALL_LDFLAGS += $(LDFLAGS)
-
-else
-  $(error "invalid configuration $(config)")
 endif
 
 # Per File Configurations
@@ -106,14 +111,26 @@ endif
 # File sets
 # #############################################
 
+GENERATED :=
 OBJECTS :=
 
+GENERATED += $(OBJDIR)/wren_compiler.o
+GENERATED += $(OBJDIR)/wren_core.o
+GENERATED += $(OBJDIR)/wren_debug.o
+GENERATED += $(OBJDIR)/wren_opt_meta.o
+GENERATED += $(OBJDIR)/wren_opt_random.o
+GENERATED += $(OBJDIR)/wren_primitive.o
+GENERATED += $(OBJDIR)/wren_strtod.o
+GENERATED += $(OBJDIR)/wren_utils.o
+GENERATED += $(OBJDIR)/wren_value.o
+GENERATED += $(OBJDIR)/wren_vm.o
 OBJECTS += $(OBJDIR)/wren_compiler.o
 OBJECTS += $(OBJDIR)/wren_core.o
 OBJECTS += $(OBJDIR)/wren_debug.o
 OBJECTS += $(OBJDIR)/wren_opt_meta.o
 OBJECTS += $(OBJDIR)/wren_opt_random.o
 OBJECTS += $(OBJDIR)/wren_primitive.o
+OBJECTS += $(OBJDIR)/wren_strtod.o
 OBJECTS += $(OBJDIR)/wren_utils.o
 OBJECTS += $(OBJDIR)/wren_value.o
 OBJECTS += $(OBJDIR)/wren_vm.o
@@ -121,10 +138,10 @@ OBJECTS += $(OBJDIR)/wren_vm.o
 # Rules
 # #############################################
 
-all: $(TARGET)
+all: prebuild prelink $(TARGET) | $(TARGETDIR) $(OBJDIR)
 	@:
 
-$(TARGET): $(OBJECTS) $(LDDEPS) | $(TARGETDIR)
+$(TARGET): $(GENERATED) $(OBJECTS) $(LDDEPS) | $(TARGETDIR)
 	$(PRELINKCMDS)
 	@echo Linking wren
 	$(SILENT) $(LINKCMD)
@@ -150,28 +167,29 @@ clean:
 	@echo Cleaning wren
 ifeq (posix,$(SHELLTYPE))
 	$(SILENT) rm -f  $(TARGET)
+	$(SILENT) rm -rf $(GENERATED)
 	$(SILENT) rm -rf $(OBJDIR)
 else
 	$(SILENT) if exist $(subst /,\\,$(TARGET)) del $(subst /,\\,$(TARGET))
+	$(SILENT) if exist $(subst /,\\,$(GENERATED)) rmdir /s /q $(subst /,\\,$(GENERATED))
 	$(SILENT) if exist $(subst /,\\,$(OBJDIR)) rmdir /s /q $(subst /,\\,$(OBJDIR))
 endif
 
-prebuild: | $(OBJDIR)
+prebuild:
 	$(PREBUILDCMDS)
 
+prelink:
+	$(PRELINKCMDS)
+
 ifneq (,$(PCH))
-$(OBJECTS): $(GCH) | $(PCH_PLACEHOLDER)
-$(GCH): $(PCH) | prebuild
+$(OBJECTS): $(GCH) $(PCH) | $(OBJDIR) $(PCH_PLACEHOLDER)
+$(GCH): $(PCH) | $(OBJDIR)
 	@echo $(notdir $<)
 	$(SILENT) $(CC) -x c-header $(ALL_CFLAGS) -o "$@" -MF "$(@:%.gch=%.d)" -c "$<"
 $(PCH_PLACEHOLDER): $(GCH) | $(OBJDIR)
-ifeq (posix,$(SHELLTYPE))
 	$(SILENT) touch "$@"
 else
-	$(SILENT) echo $null >> "$@"
-endif
-else
-$(OBJECTS): | prebuild
+$(OBJECTS): | $(OBJDIR)
 endif
 
 
@@ -196,6 +214,9 @@ $(OBJDIR)/wren_debug.o: ../../src/vm/wren_debug.c
 $(OBJDIR)/wren_primitive.o: ../../src/vm/wren_primitive.c
 	@echo $(notdir $<)
 	$(SILENT) $(CC) $(ALL_CFLAGS) $(FORCE_INCLUDE) -o "$@" -MF "$(@:%.o=%.d)" -c "$<"
+$(OBJDIR)/wren_strtod.o: ../../src/vm/wren_strtod.c
+	@echo $(notdir $<)
+	$(SILENT) $(CC) $(ALL_CFLAGS) $(FORCE_INCLUDE) -o "$@" -MF "$(@:%.o=%.d)" -c "$<"
 $(OBJDIR)/wren_utils.o: ../../src/vm/wren_utils.c
 	@echo $(notdir $<)
 	$(SILENT) $(CC) $(ALL_CFLAGS) $(FORCE_INCLUDE) -o "$@" -MF "$(@:%.o=%.d)" -c "$<"
@@ -208,5 +229,5 @@ $(OBJDIR)/wren_vm.o: ../../src/vm/wren_vm.c
 
 -include $(OBJECTS:%.o=%.d)
 ifneq (,$(PCH))
-  -include $(PCH_PLACEHOLDER).d
+  -include "$(PCH_PLACEHOLDER).d"
 endif

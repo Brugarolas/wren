@@ -27,6 +27,9 @@
     <ClInclude Include="..\..\test\api\foreign_class.h">
       <Filter>api</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\test\api\foreign_method_user_data.h">
+      <Filter>api</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\test\api\get_variable.h">
       <Filter>api</Filter>
     </ClInclude>
@@ -40,6 +43,9 @@
       <Filter>api</Filter>
     </ClInclude>
     <ClInclude Include="..\..\test\api\new_vm.h">
+      <Filter>api</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\test\api\raw_value.h">
       <Filter>api</Filter>
     </ClInclude>
     <ClInclude Include="..\..\test\api\reset_stack_after_call_abort.h">
@@ -81,6 +87,9 @@
     <ClCompile Include="..\..\test\api\foreign_class.c">
       <Filter>api</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\test\api\foreign_method_user_data.c">
+      <Filter>api</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\test\api\get_variable.c">
       <Filter>api</Filter>
     </ClCompile>
@@ -94,6 +103,9 @@
       <Filter>api</Filter>
     </ClCompile>
     <ClCompile Include="..\..\test\api\new_vm.c">
+      <Filter>api</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\test\api\raw_value.c">
       <Filter>api</Filter>
     </ClCompile>
     <ClCompile Include="..\..\test\api\reset_stack_after_call_abort.c">

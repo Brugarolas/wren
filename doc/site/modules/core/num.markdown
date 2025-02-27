@@ -27,6 +27,26 @@ The value of &pi;.
 
 The value of &tau;. This is equivalent to ```2 * Num.pi```.
 
+### Num.**toDeg**
+
+Multiplier to convert a number of radians to degrees.
+
+<pre class="snippet">
+var radians = Num.pi
+var degrees = radians * Num.toDeg 
+System.print(degrees) //> 180
+</pre>
+
+### Num.**toRad**
+
+Multiplier to convert a number of degrees to radians.
+
+<pre class="snippet">
+var degrees = 180
+var radians = degrees * Num.toRad
+System.print(radians) //> 3.1415926535898
+</pre>
+
 ### Num.**largest**
 
 The largest representable numeric value.
@@ -164,6 +184,18 @@ itself is returned.
 
 Raises this number (the base) to `power`. Returns `nan` if the base is negative.
 
+### **quo**(other)
+
+Returns the quotient of this number and `other` rounded, if not already an integer, to the nearest integer towards zero. It is equivalent to: `(this/other).truncate`.
+
+<pre class="snippet">
+System.print(10.quo(4))     //> 2
+System.print(10.quo(-4))    //> -2
+System.print(15.4.quo(3.6)) //> 4
+</pre>
+
+It is a runtime error if `other` is not a number.
+
 ### **round**
 
 Rounds the number to the nearest integer.
@@ -193,6 +225,20 @@ The tangent of the number.
 ### **toString**
 
 The string representation of the number.
+
+### **toCBool**
+
+Converts the number to a Bool using the C99 language's notion of truth i.e. 0 (or -0) corresponds to `false` and any other number (including ±infinity and NaN) to `true`.
+
+Note that this differs from Wren's notion of truth where every number (including ±0) is considered to be true.
+
+<pre class="snippet">
+System.print((-0).toCBool)  //> false
+System.print((0).toCBool)   //> false
+System.print((0.8).toCBool) //> true
+System.print(1.toCBool)     //> true
+System.print((-2).toCBool)  //> true
+</pre>
 
 ### **truncate**
 
@@ -233,6 +279,15 @@ It is a runtime error if `denominator` is not a number.
 
 Compares this and `other`, returning `true` or `false` based on how the numbers
 are ordered. It is a runtime error if `other` is not a number.
+
+### **&lt;&lt;**(rhs), **&gt;&gt;**(rhs), **bitwiseShift**(rhs) operators
+
+Performs *bitwise* logical shift on the number. The number is first converted
+to a 32-bit unsigned value, which will truncate any floating point value. The
+bits of the result of that are then shifted, yielding the result.
+
+It is a runtime error if `other` is not a positive integer, unless using
+`bitwiseShift(rhs)` which accept any integer allowing left/right shifting.
 
 ### **~** operator
 

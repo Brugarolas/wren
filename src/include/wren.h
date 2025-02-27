@@ -4,6 +4,7 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 // The Wren semantic version number components.
 #define WREN_VERSION_MAJOR 0
@@ -33,12 +34,33 @@
 // here.
 typedef struct WrenVM WrenVM;
 
+// The Wren garbage collector's tracer
+//
+// This is passed to objects' trace hooks so that they may trace their
+// RawValues in order that the GC may know about thm
+typedef struct WrenTracer WrenTracer;
+
 // A handle to a Wren object.
 //
 // This lets code outside of the VM hold a persistent reference to an object.
 // After a handle is acquired, and until it is released, this ensures the
 // garbage collector will not reclaim the object it references.
 typedef struct WrenHandle WrenHandle;
+
+// A raw Wren object reference
+//
+// WrenRawValues allow code to manipulate references to an object directly.
+// Unlike WrenHandles, these are *not* GC roots. If you do not trace these
+// objects from a Foreign class' trace hook, then any objects referenced
+// through a WrenRawValue may be garbage collected
+//
+// These form a powerful, but tricky-to-use API, that requires care to use
+//
+// The internaal representation of these values is subject to change.
+typedef union WrenRawValue {
+  uint64_t  bits;
+  void     *ptr;
+} WrenRawValue;
 
 // A generic allocation function that handles all explicit memory management
 // used by Wren. It's used like so:
@@ -58,7 +80,15 @@ typedef struct WrenHandle WrenHandle;
 typedef void* (*WrenReallocateFn)(void* memory, size_t newSize, void* userData);
 
 // A function callable from Wren code, but implemented in C.
-typedef void (*WrenForeignMethodFn)(WrenVM* vm);
+typedef void (*WrenForeignMethodFn)(WrenVM* vm, void *userData);
+
+// A tracer function for marking objects reachable from this object instance.
+// Tracer functions do not have access to the VM and must not call back into it
+// by other means, as it is in the middle of garbage collection
+//
+// The return value of this function is the size that this object should be treated
+// as (in bytes) for garbage collector accounting purposes.
+typedef size_t (*WrenTracerFn)(WrenTracer* tracer, void* data);
 
 // A finalizer function for freeing resources owned by an instance of a foreign
 // class. Unlike most foreign methods, finalizers do not have access to the VM
@@ -93,9 +123,19 @@ typedef struct WrenLoadModuleResult
 // Loads and returns the source code for the module [name].
 typedef WrenLoadModuleResult (*WrenLoadModuleFn)(WrenVM* vm, const char* name);
 
-// Returns a pointer to a foreign method on [className] in [module] with
-// [signature].
-typedef WrenForeignMethodFn (*WrenBindForeignMethodFn)(WrenVM* vm,
+// The result of a bindForeignMethodFn call.
+// [executeFn] is the function to call.
+// [userData] is passed to [executeFn].  The caller is responsible for making
+// sure [userData] is still valid whenever Wren calls [executeFn].
+typedef struct WrenBindForeignMethodResult {
+  WrenForeignMethodFn executeFn;
+  void* userData;
+} WrenBindForeignMethodResult;
+
+// Returns a foreign method and userdata on [className] in [module]
+// with [isStatic]/[signature].  If the method is not found, the returned
+// WrenBindForeignMethodResult.executeFn == NULL.
+typedef WrenBindForeignMethodResult (*WrenBindForeignMethodFn)(WrenVM* vm,
     const char* module, const char* className, bool isStatic,
     const char* signature);
 
@@ -143,6 +183,12 @@ typedef struct
   //
   // This may be `NULL` if the foreign class does not need to finalize.
   WrenFinalizerFn finalize;
+
+  // The callback invoked by the garbage collector duirng the mark phase
+  // in order to trace all objects pointed to by this object
+  //
+  // This may be `NULL` if the foreign class does not need tracing.
+  WrenTracerFn trace;
 } WrenForeignClassMethods;
 
 // Returns a pair of pointers to the foreign methods used to allocate and
@@ -401,6 +447,27 @@ WREN_API void wrenEnsureSlots(WrenVM* vm, int numSlots);
 // Gets the type of the object in [slot].
 WREN_API WrenType wrenGetSlotType(WrenVM* vm, int slot);
 
+// Gets the class of the object in [slot] and stores it in [classSlot].
+//
+// If the object in [slot] is a class, it is returned unchanged into
+// [classSlot].
+WREN_API void wrenGetSlotClass(WrenVM* vm, int slot, int classSlot);
+
+// Gets the name of the class in [slot].
+//
+// The string returned is the property of the [vm] so it must not be freed
+// by the caller.
+//
+// This function returns null if there is no class object in [slot].
+//
+// This function is meant for debugging purposes only and should never be used
+// to discriminate a class from another as the caller has no guaranty regarding
+// the origin of the class. To discriminate a class, one should prefer the use
+// of [wrenGetVariable()] followed by [wrenGetSlotClass()] and
+// [wrenIsSameClass()] instead, the first call being the insurance that the
+// class to discrimitate actually comes from the expected module.
+WREN_API const char *wrenGetSlotClassName(WrenVM* vm, int slot);
+
 // Reads a boolean value from [slot].
 //
 // It is an error to call this if the slot does not contain a boolean value.
@@ -444,6 +511,11 @@ WREN_API const char* wrenGetSlotString(WrenVM* vm, int slot);
 // This will prevent the object that is referred to from being garbage collected
 // until the handle is released by calling [wrenReleaseHandle()].
 WREN_API WrenHandle* wrenGetSlotHandle(WrenVM* vm, int slot);
+
+// Returns the value stored in [slot] as a RawValue
+//
+// The usual cautions around using raw values apply
+WREN_API WrenRawValue wrenGetSlotRawValue(WrenVM* vm, int slot);
 
 // Stores the boolean [value] in [slot].
 WREN_API void wrenSetSlotBool(WrenVM* vm, int slot, bool value);
@@ -490,6 +562,11 @@ WREN_API void wrenSetSlotString(WrenVM* vm, int slot, const char* text);
 // This does not release the handle for the value.
 WREN_API void wrenSetSlotHandle(WrenVM* vm, int slot, WrenHandle* handle);
 
+// Stores th value captured in [RawValue] in [slot]
+//
+// It is your respnsibility to ensure the RawValue is still valid
+WREN_API void wrenSetSlotRawValue(WrenVM* vm, int slot, WrenRawValue rawvalue);
+
 // Returns the number of elements in the list stored in [slot].
 WREN_API int wrenGetListCount(WrenVM* vm, int slot);
 
@@ -514,6 +591,10 @@ WREN_API int wrenGetMapCount(WrenVM* vm, int slot);
 // Returns true if the key in [keySlot] is found in the map placed in [mapSlot].
 WREN_API bool wrenGetMapContainsKey(WrenVM* vm, int mapSlot, int keySlot);
 
+// Retrieves the value and key at element [index] from the map in [mapSlot] and
+// stores it in [keySlot] and [valueSlot].
+WREN_API void wrenGetMapKeyValueAt(WrenVM* vm, int mapSlot, int index, int keySlot, int valueSlot);
+
 // Retrieves a value with the key in [keySlot] from the map in [mapSlot] and
 // stores it in [valueSlot].
 WREN_API void wrenGetMapValue(WrenVM* vm, int mapSlot, int keySlot, int valueSlot);
@@ -528,6 +609,14 @@ WREN_API void wrenSetMapValue(WrenVM* vm, int mapSlot, int keySlot, int valueSlo
 WREN_API void wrenRemoveMapValue(WrenVM* vm, int mapSlot, int keySlot,
                         int removedValueSlot);
 
+// Returns the top level variable count in resolved [module].
+WREN_API int wrenGetVariableCount(WrenVM* vm, const char* module);
+
+// Retrieves the top level variable at element [index] in resolved [module] and stores
+// it in [slot].
+WREN_API void wrenGetVariableAt(WrenVM* vm, const char* module, int index,
+                     int slot);
+
 // Looks up the top level variable with [name] in resolved [module] and stores
 // it in [slot].
 WREN_API void wrenGetVariable(WrenVM* vm, const char* module, const char* name,
@@ -541,6 +630,13 @@ WREN_API bool wrenHasVariable(WrenVM* vm, const char* module, const char* name);
 // Returns true if [module] has been imported/resolved before, false if not.
 WREN_API bool wrenHasModule(WrenVM* vm, const char* module);
 
+// Returns true if the class in [slotA] is the same as the one in [slotB].
+WREN_API bool wrenIsSameClass(WrenVM* vm, int slotA, int slotB);
+
+// Returns true if the class in [slotA] is the same class or a subclass of
+// the class in [slotB].
+WREN_API bool wrenIsSubClass(WrenVM* vm, int slotA, int slotB);
+
 // Sets the current fiber to be aborted, and uses the value in [slot] as the
 // runtime error object.
 WREN_API void wrenAbortFiber(WrenVM* vm, int slot);
@@ -550,5 +646,15 @@ WREN_API void* wrenGetUserData(WrenVM* vm);
 
 // Sets user data associated with the WrenVM.
 WREN_API void wrenSetUserData(WrenVM* vm, void* userData);
+
+// Returns a raw value representing `null`
+WREN_API WrenRawValue wrenNullRawValue(void);
+
+// Traces the passed RawValue
+WREN_API void wrenTraceRawValue(WrenTracer *tracer, WrenRawValue value);
+
+// Sets how many values are returned from a foreign call.
+WREN_API void wrenSetForeignReturnValues(WrenVM* vm, int num);
+
 
 #endif

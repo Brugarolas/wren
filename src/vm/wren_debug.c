@@ -159,7 +159,7 @@ static int dumpInstruction(WrenVM* vm, ObjFn* fn, int i, int* lastLine)
     {
       int slot = READ_SHORT();
       printf("%-16s %5d '%s'\n", "LOAD_MODULE_VAR", slot,
-             fn->module->variableNames.data[slot]->value);
+             wrenSymbolTableGet(&fn->module->variableNames, slot)->value);
       break;
     }
 
@@ -167,7 +167,7 @@ static int dumpInstruction(WrenVM* vm, ObjFn* fn, int i, int* lastLine)
     {
       int slot = READ_SHORT();
       printf("%-16s %5d '%s'\n", "STORE_MODULE_VAR", slot,
-             fn->module->variableNames.data[slot]->value);
+             wrenSymbolTableGet(&fn->module->variableNames, slot)->value);
       break;
     }
 
@@ -199,7 +199,7 @@ static int dumpInstruction(WrenVM* vm, ObjFn* fn, int i, int* lastLine)
       int numArgs = bytecode[i - 1] - CODE_CALL_0;
       int symbol = READ_SHORT();
       printf("CALL_%-11d %5d '%s'\n", numArgs, symbol,
-             vm->methodNames.data[symbol]->value);
+             wrenSymbolTableGet(&vm->methodNames, symbol)->value);
       break;
     }
 
@@ -225,7 +225,7 @@ static int dumpInstruction(WrenVM* vm, ObjFn* fn, int i, int* lastLine)
       int symbol = READ_SHORT();
       int superclass = READ_SHORT();
       printf("SUPER_%-10d %5d '%s' %5d\n", numArgs, symbol,
-             vm->methodNames.data[symbol]->value, superclass);
+             wrenSymbolTableGet(&vm->methodNames, symbol)->value, superclass);
       break;
     }
 
@@ -295,14 +295,20 @@ static int dumpInstruction(WrenVM* vm, ObjFn* fn, int i, int* lastLine)
       break;
     }
 
-    case CODE_FOREIGN_CLASS: printf("FOREIGN_CLASS\n"); break;
+    case CODE_FOREIGN_CLASS:
+    {
+      int numFields = READ_BYTE();
+      printf("%-16s %5d fields\n", "FOREIGN_CLASS", numFields);
+      break;
+    }
+
     case CODE_END_CLASS: printf("END_CLASS\n"); break;
 
     case CODE_METHOD_INSTANCE:
     {
       int symbol = READ_SHORT();
       printf("%-16s %5d '%s'\n", "METHOD_INSTANCE", symbol,
-             vm->methodNames.data[symbol]->value);
+             wrenSymbolTableGet(&vm->methodNames, symbol)->value);
       break;
     }
 
@@ -310,7 +316,7 @@ static int dumpInstruction(WrenVM* vm, ObjFn* fn, int i, int* lastLine)
     {
       int symbol = READ_SHORT();
       printf("%-16s %5d '%s'\n", "METHOD_STATIC", symbol,
-             vm->methodNames.data[symbol]->value);
+             wrenSymbolTableGet(&vm->methodNames, symbol)->value);
       break;
     }
       
@@ -336,6 +342,10 @@ static int dumpInstruction(WrenVM* vm, ObjFn* fn, int i, int* lastLine)
       break;
     }
       
+    case CODE_SWAP:
+      printf("SWAP\n");
+      break;
+
     case CODE_END:
       printf("END\n");
       break;

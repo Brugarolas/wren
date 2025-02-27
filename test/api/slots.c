@@ -3,12 +3,12 @@
 
 #include "slots.h"
 
-static void noSet(WrenVM* vm)
+static void noSet(WrenVM* vm, void *userData)
 {
   // Do nothing.
 }
 
-static void getSlots(WrenVM* vm)
+static void getSlots(WrenVM* vm, void *userData)
 {
   bool result = true;
   if (wrenGetSlotBool(vm, 1) != true) result = false;
@@ -37,7 +37,7 @@ static void getSlots(WrenVM* vm)
   wrenReleaseHandle(vm, handle);
 }
 
-static void setSlots(WrenVM* vm)
+static void setSlots(WrenVM* vm, void *userData)
 {
   WrenHandle* handle = wrenGetSlotHandle(vm, 1);
 
@@ -76,7 +76,7 @@ static void setSlots(WrenVM* vm)
   wrenReleaseHandle(vm, handle);
 }
 
-static void slotTypes(WrenVM* vm)
+static void slotTypes(WrenVM* vm, void *userData)
 {
   bool result =
       wrenGetSlotType(vm, 1) == WREN_TYPE_BOOL &&
@@ -91,7 +91,7 @@ static void slotTypes(WrenVM* vm)
   wrenSetSlotBool(vm, 0, result);
 }
 
-static void ensure(WrenVM* vm)
+static void ensure(WrenVM* vm, void *userData)
 {
   int before = wrenGetSlotCount(vm);
 
@@ -117,7 +117,7 @@ static void ensure(WrenVM* vm)
   wrenSetSlotString(vm, 0, result);
 }
 
-static void ensureOutsideForeign(WrenVM* vm)
+static void ensureOutsideForeign(WrenVM* vm, void *userData)
 {
   // To test the behavior outside of a foreign method (which we're currently
   // in), create a new separate VM.
@@ -151,25 +151,75 @@ static void ensureOutsideForeign(WrenVM* vm)
   wrenSetSlotString(vm, 0, result);
 }
 
-static void foreignClassAllocate(WrenVM* vm)
+static void foreignClassAllocate(WrenVM* vm, void *userData)
 {
   wrenSetSlotNewForeign(vm, 0, 0, 4);
 }
 
-static void getListCount(WrenVM* vm)
+static void getListCount(WrenVM* vm, void *userData)
 {
   wrenSetSlotDouble(vm, 0, wrenGetListCount(vm, 1));
 }
 
-static void getListElement(WrenVM* vm)
+static void getListElement(WrenVM* vm, void *userData)
 {
   int index = (int)wrenGetSlotDouble(vm, 2);
   wrenGetListElement(vm, 1, index, 0);
 }
 
-static void getMapValue(WrenVM* vm)
+static void getMapValue(WrenVM* vm, void *userData)
 {
   wrenGetMapValue(vm, 1, 2, 0);
+}
+
+static void getSlotClass(WrenVM* vm)
+{
+  wrenGetSlotClass(vm, 1, 0);
+}
+
+static void getSlotClassName(WrenVM* vm)
+{
+  const char* name = wrenGetSlotClassName(vm, 1);
+
+  if (name == NULL)
+  {
+    wrenSetSlotNull(vm, 0);
+  }
+  else
+  {
+    wrenSetSlotString(vm, 0, name);
+  }
+}
+
+static void isParameterForeignType(WrenVM* vm)
+{
+    // First, get whatever variable is named "ForeignType" in the slots module.
+    wrenGetVariable(vm, "./test/api/slots", "ForeignType", 0);
+
+    // Then, retrieve the class of the variable.
+    wrenGetSlotClass(vm, 0, 0);
+
+    // Then, retrieve the class of the parameter.
+    wrenGetSlotClass(vm, 1, 1);
+
+    // Finally, check that both are "the same".
+    wrenSetSlotBool(vm, 0, wrenIsSameClass(vm, 0, 1));
+}
+
+static void isParameterForeignTypeByName(WrenVM* vm)
+{
+    // First, retrieve the class of the parameter.
+    wrenGetSlotClass(vm, 1, 1);
+
+    // Finally, check that the class is named "ForeignType".
+    //
+    // Please note that this is definitely what you should not do to ensure
+    // you've been given the right parameter class, as the "ForeignType" here
+    // only validates the name and not its origin.
+    // From what we know, the parameter we've been given might come from any
+    // module, "./test/api/slots" or anything else.
+    const char* name = wrenGetSlotClassName(vm, 1);
+    wrenSetSlotBool(vm, 0, strcmp(name, "ForeignType") == 0);
 }
 
 WrenForeignMethodFn slotsBindMethod(const char* signature)
@@ -183,6 +233,10 @@ WrenForeignMethodFn slotsBindMethod(const char* signature)
   if (strcmp(signature, "static Slots.getListCount(_)") == 0) return getListCount;
   if (strcmp(signature, "static Slots.getListElement(_,_)") == 0) return getListElement;
   if (strcmp(signature, "static Slots.getMapValue(_,_)") == 0) return getMapValue;
+  if (strcmp(signature, "static Slots.getSlotClass(_)") == 0) return getSlotClass;
+  if (strcmp(signature, "static Slots.getSlotClassName(_)") == 0) return getSlotClassName;
+  if (strcmp(signature, "static Slots.isParameterForeignType(_)") == 0) return isParameterForeignType;
+  if (strcmp(signature, "static Slots.isParameterForeignTypeByName(_)") == 0) return isParameterForeignTypeByName;
 
   return NULL;
 }

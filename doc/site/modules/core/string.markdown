@@ -117,6 +117,20 @@ var string = "(ᵔᴥᵔ)"
 System.print(string.codePoints[2]) //> -1 (in the middle of "ᵔ")
 </pre>
 
+### **compareTo**(other)
+
+Compares this string with `other` lexicographically by codepoint.
+
+Returns a negative value if `this` appears before `other`, zero if `this` compares equal to `other` or a positive value if `this` appears after `other` in lexicographical order.
+
+<pre class="snippet">
+System.print("abc".compareTo("def")) //> -3
+System.print("def".compareTo("abc")) //> 3
+System.print("abc".compareTo("abc")) //> 0
+</pre>
+
+It is a runtime error if `other` is not a string.
+
 ### **contains**(other)
 
 Checks if `other` is a substring of the string.
@@ -250,6 +264,14 @@ Like `trim()` but only removes from the beginning of the string.
 System.print("ᵔᴥᵔᴥᵔbearᵔᴥᴥᵔᵔ".trimStart("ᵔᴥ")) //> bearᵔᴥᴥᵔᵔ
 </pre>
 
+### **lower**
+
+Returns a new string with all ASCII and basic IS0-8859-1 characters converted to lower case.
+
+<pre class="snippet">
+System.print("HÉllo World!".lower) //> "héllo world!"
+</pre>
+
 ### **+**(other) operator
 
 Returns a new string that concatenates this string and `other`.
@@ -268,7 +290,23 @@ Checks if the string is equal to `other`.
 
 ### **!=**(other) operator
 
-Check if the string is not equal to `other`.
+Checks if the string is not equal to `other`.
+
+### **<**(other) operator
+
+Checks if the string appears before `other` in lexicographical order.
+
+### **<=**(other) operator
+
+Checks if the string appears before or compares equal to `other` in lexicographical order.
+
+### **>**(other) operator
+
+Checks if the string appears after `other` in lexicographical order
+
+### **>=**(other) operator
+
+Checks if the string appears after or compares equal to `other` in lexicographical order.
 
 ### **[**index**]** operator
 

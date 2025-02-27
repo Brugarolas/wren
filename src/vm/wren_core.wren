@@ -1,8 +1,68 @@
 class Bool {}
 class Fiber {}
-class Fn {}
+class Fn {
+  !~(arg) { !(arg ~~ this) }
+}
 class Null {}
-class Num {}
+class Num {
+  trait(Key) {
+    if (Key is Class) {
+      var Klass = Num.traits[Key.name]
+      return Klass.new(this)
+    }
+    return Num.traits[Key].call(this)
+  }
+
+  static trait(Key) {
+    if (Key is Class) {
+      var Klass = Num.traits[Key.name]
+      return Klass
+    }
+    return Num.traits[Key]
+  }
+
+  static trait(Key, Value) {
+    if (Key is Class) {
+      return Num.traits[Key.name] = Value
+    }
+    return Num.traits[Key] = Value
+  }
+
+  static use(Key) {
+    return Num.trait(Key, Key)
+  }
+  
+  static traits {
+    if (!__traits) {
+      __traits = Map.new()
+    }
+    return __traits
+  }
+}
+
+class Fn {
+  callAll(args) {
+    var arity = args.count
+
+    if (arity ==  0) return call()
+    if (arity ==  1) return call(args[0])
+    if (arity ==  2) return call(args[0], args[1])
+    if (arity ==  3) return call(args[0], args[1], args[2])
+    if (arity ==  4) return call(args[0], args[1], args[2], args[3])
+    if (arity ==  5) return call(args[0], args[1], args[2], args[3], args[4])
+    if (arity ==  6) return call(args[0], args[1], args[2], args[3], args[4], args[5])
+    if (arity ==  7) return call(args[0], args[1], args[2], args[3], args[4], args[5], args[6])
+    if (arity ==  8) return call(args[0], args[1], args[2], args[3], args[4], args[5], args[6], args[7])
+    if (arity ==  9) return call(args[0], args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8])
+    if (arity == 10) return call(args[0], args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8], args[9])
+    if (arity == 11) return call(args[0], args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8], args[9], args[10])
+    if (arity == 12) return call(args[0], args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8], args[9], args[10], args[11])
+    if (arity == 13) return call(args[0], args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8], args[9], args[10], args[11], args[12])
+    if (arity == 14) return call(args[0], args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8], args[9], args[10], args[11], args[12], args[13])
+    if (arity == 15) return call(args[0], args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8], args[9], args[10], args[11], args[12], args[13], args[14])
+                     return call(args[0], args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8], args[9], args[10], args[11], args[12], args[13], args[14], args[15])
+  }
+}
 
 class Sequence {
   all(f) {
@@ -30,6 +90,12 @@ class Sequence {
     return false
   }
 
+  ~~(element) { contains(element) }
+
+  !~(element) {
+    return !contains(element)
+  }
+
   count {
     var result = 0
     for (element in this) {
@@ -50,6 +116,16 @@ class Sequence {
     for (element in this) {
       f.call(element)
     }
+  }
+
+  find(predicate) { find(iterate(null), predicate) }
+
+  find(it, predicate) {
+    while(it) {
+      if (predicate.call(iteratorValue(it))) break
+      it = iterate(it)
+    }
+    return it
   }
 
   isEmpty { iterate(null) ? false : true }
@@ -181,9 +257,34 @@ class WhereSequence is Sequence {
   iteratorValue(iterator) { _sequence.iteratorValue(iterator) }
 }
 
+class SeqMatchIfContains {
+  construct new(seq) {
+    _seq = seq
+  }
+
+  ~~(needle) { _seq.contains(needle) }
+  !~(needle) { !_seq.contains(needle) }
+}
+
 class String is Sequence {
+  trait(key) {String.traits[key].call(this)}
+  trait(key, value) {String.trait(key, value)}
+  traits {String.traits}
+  
+  static trait(key) {String.traits[key]}
+  static trait(key, value) {String.traits[key] = value}
+  
+  static traits {
+    if (!__traits) {
+      __traits = Map.new()
+    }
+    return __traits
+  }
+
   bytes { StringByteSequence.new(this) }
   codePoints { StringCodePointSequence.new(this) }
+
+  part { SeqMatchIfContains.new(this) }
 
   split(delimiter) {
     if (!(delimiter is String) || delimiter.isEmpty) {
@@ -234,6 +335,17 @@ class String is Sequence {
     if (last < size) result = result + this[last..-1]
 
     return result
+  }
+
+  lower {
+    var output = ""
+    for (c in codePoints) {
+      if ((c >= 65 && c <= 90) || (c >= 192 && c <= 214) || (c >= 216 && c <= 222)) {
+        c = c + 32
+      }
+      output = output + String.fromCodePoint(c)
+    }
+    return output
   }
 
   trim() { trim_("\t\r\n ", true, true) }
@@ -289,6 +401,11 @@ class String is Sequence {
     }
     return result
   }
+ 
+  <  (other) { compareTo(other) <  0 }
+  <= (other) { compareTo(other) <= 0 }
+  >  (other) { compareTo(other) >  0 }
+  >= (other) { compareTo(other) >= 0 }
 }
 
 class StringByteSequence is Sequence {
@@ -336,26 +453,28 @@ class List is Sequence {
   quicksort_(low, high, comparer) {
     if (low < high) {
       var p = partition_(low, high, comparer)
-      quicksort_(low, p - 1, comparer)
+      quicksort_(low, p, comparer)
       quicksort_(p + 1, high, comparer)
     }
   }
 
   partition_(low, high, comparer) {
-    var p = this[high]
+    var mid = ((low + high) / 2).floor
+    var p = this[mid]
     var i = low - 1
-    for (j in low..(high-1)) {
-      if (comparer.call(this[j], p)) {  
+    var j = high + 1
+    while (true) {
+      while (true) {
         i = i + 1
-        var t = this[i]
-        this[i] = this[j]
-        this[j] = t
+        if (!comparer.call(this[i], p)) break
       }
+      while (true) {
+        j = j - 1
+        if (!comparer.call(p, this[j])) break
+      }
+      if (i >= j) return j
+      swap(i, j)
     }
-    var t = this[i+1]
-    this[i+1] = this[high]
-    this[high] = t
-    return i+1
   }
 
   toString { "[%(join(", "))]" }
