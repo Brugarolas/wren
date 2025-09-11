@@ -1251,6 +1251,9 @@ static void blackenFn(WrenVM* vm, ObjFn* fn)
   // Mark the constants.
   wrenGrayBuffer(vm, &fn->constants);
 
+  // Mark the module it belongs to, in case it's been unloaded.
+  wrenGrayObj(vm, (Obj*)fn->module);
+
   // Keep track of how much memory is still in use.
   vm->bytesAllocated += sizeof(ObjFn);
   vm->bytesAllocated += sizeof(uint8_t) * fn->code.capacity;
